@@ -20,8 +20,21 @@ public class SecurityConfig {
     ) throws Exception {
 
         http
-                // CORS is handled by the API Gateway — disable here to avoid duplicate headers
-                .cors(cors -> cors.disable())
+                .cors(cors -> cors.configurationSource(request -> {
+                    var config = new org.springframework.web.cors.CorsConfiguration();
+                    config.setAllowedOrigins(java.util.List.of(
+                            "http://localhost:4200",
+                            "https://qr-scanserve.vercel.app",
+                            "https://qr-admin-prananvs-projects.vercel.app",
+                            "http://localhost:5173",
+                            "https://qrfooiesadmin.vercel.app",
+                            "https://food-qr-micro-services-3.onrender.com"
+                    ));
+                    config.setAllowedMethods(java.util.List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
+                    config.setAllowedHeaders(java.util.List.of("*"));
+                    config.setAllowCredentials(true);
+                    return config;
+                }))
                 .csrf(csrf -> csrf.disable())
                 .sessionManagement(sm ->
                         sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS)
@@ -29,12 +42,20 @@ public class SecurityConfig {
 
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(
-                                "/admin/**",
-                                "/login",
-                                "/register",
-                                "/health",
-                                "/session/**"
+                                "/auth/login",
+                                "/auth/register",
+                                "/auth/health",
+                                "/auth/session/**",
+                                "/menu/health",
+                                "/menu/items",
+                                "/menu/items-by-category",
+                                "/menu/categories",
+                                "/cart/health",
+                                "/order/health",
+                                "/inventory/health",
+                                "/actuator/**"
                         ).permitAll()
+                        .requestMatchers(org.springframework.http.HttpMethod.OPTIONS, "/**").permitAll()
                         .anyRequest().authenticated()
                 )
 

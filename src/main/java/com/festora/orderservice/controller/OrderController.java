@@ -1,0 +1,121 @@
+package com.festora.orderservice.controller;
+
+import com.festora.orderservice.dto.CreateOrderRequest;
+import com.festora.orderservice.dto.OrderCreateResponse;
+import com.festora.orderservice.model.Order;
+import com.festora.orderservice.model.OrderItem;
+import com.festora.orderservice.service.OrderService;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
+
+@RestController
+@RequestMapping("/order")
+@RequiredArgsConstructor
+@Slf4j
+public class OrderController {
+
+    private final OrderService orderService;
+
+    @GetMapping("/health")
+    public ResponseEntity<String> health() {
+        return new ResponseEntity<>("Order Service up !!!", HttpStatus.OK);
+    }
+    
+    @GetMapping("/my")
+    public ResponseEntity<List<Order>> getMyOrders(
+            @RequestHeader("X-Restaurant-Id") Long restaurantId,
+            @RequestHeader("X-Table-No") Integer tableNumber,
+            @RequestHeader("X-User-Id") String userId,
+            @RequestHeader(value = "X-Device-Id", required = false) String deviceId
+    ) {
+        try {
+            return new ResponseEntity<>(orderService.getAllOrdersForTableByRestaurantId(restaurantId, tableNumber, userId, deviceId), HttpStatus.OK);
+        } catch (Exception e){
+            return new ResponseEntity<>(HttpStatus.BAD_REQUEST);
+        }
+    }
+
+    @PostMapping("/create")
+    public ResponseEntity<OrderCreateResponse> createOrder(@RequestBody CreateOrderRequest request) {
+        try {
+            Order order = orderService.createOrder(request);
+
+            return ResponseEntity.status(HttpStatus.CREATED)
+                    .body(OrderCreateResponse.builder()
+                            .orderId(order.getOrderId())
+                            .status(order.getStatus())
+                            .totalAmount(order.getTotalAmount())
+                            .build());
+        } catch (Exception e) {
+            log.error("Order creation failed for request {}: {}", request, e.getMessage(), e);
+            return ResponseEntity.badRequest().build();
+        }
+    }
+
+    // ==================================================
+    // 2) Get Order (UI / Admin / Kitchen)
+    // ==================================================
+    @GetMapping("/{orderId}")
+    public ResponseEntity<Order> getOrder(@PathVariable String orderId) {
+        return ResponseEntity.ok(orderService.getOrder(orderId));
+    }
+
+    // ==================================================
+    // 3) Payment Callback (Success)
+    // ==================================================
+    @PostMapping("/{orderId}/payment/success")
+    public ResponseEntity<Void> paymentSuccess(@PathVariable String orderId) {
+        orderService.onPaymentSuccess(orderId);
+        return ResponseEntity.ok().build();
+    }
+
+//    @PostMapping("/{orderId}/ready")
+//    public ResponseEntity<Void> markReady(@PathVariable String orderId) {
+//        orderService.markReady(orderId);
+//        return ResponseEntity.ok().build();
+//    }
+
+    @PostMapping("/{orderId}/served")
+    public ResponseEntity<Void> markServed(@PathVariable String orderId) {
+        orderService.markServed(orderId);
+        return ResponseEntity.ok().build();
+    }
+
+    @PostMapping("/{orderId}/close")
+    public ResponseEntity<Void> closeOrder(@PathVariable String orderId) {
+        orderService.closeOrder(orderId);
+        return ResponseEntity.ok().build();
+    }
+
+    @PostMapping("/{orderId}/items")
+    public ResponseEntity<Order> addItems(
+            @PathVariable String orderId,
+            @RequestBody List<OrderItem> items
+    ) {
+        return ResponseEntity.ok(
+                orderService.addItems(orderId, items)
+        );
+    }
+
+    @PostMapping("/{orderId}/request-bill")
+    public ResponseEntity<Void> requestBill(@PathVariable String orderId) {
+        orderService.requestBill(orderId);
+        return ResponseEntity.ok().build();
+    }
+
+    @PostMapping("/{orderId}/cancel")
+    public ResponseEntity<Void> cancelOrder(
+            @PathVariable String orderId,
+            @RequestParam(required = false) String reason
+    ) {
+        orderService.cancelOrder(orderId,
+                reason == null ? "MANUAL_CANCEL" : reason);
+        return ResponseEntity.ok().build();
+    }
+
+}

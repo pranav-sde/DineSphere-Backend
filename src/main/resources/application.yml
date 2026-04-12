@@ -1,0 +1,98 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: food-qr-monolith
+  
+  data:
+    mongodb:
+      uri: ${MONGODB_URI:mongodb+srv://restrofoodiescanner_db_user:p6g4IAduGwk2t5To@pranav001.8l3iyj8.mongodb.net/food_qr_db?retryWrites=true&w=majority}
+    redis:
+      url: ${REDIS_URL:rediss://default:ASUXAAImcDE1ODdhYWZiYjE2MDA0YmIzYjEwYWU5OTQzMDU2OTZkZHAxOTQ5NQ@talented-fawn-9495.upstash.io:6379}
+      timeout: 50s
+
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    consumer:
+      group-id: food-qr-group
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+      properties:
+        spring.json.trusted.packages: "*"
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+
+# Auth Service Configs
+app:
+  qr:
+    secret: ${APP_QR_SECRET:"TnsLD53NKeFsHhZ73ojREN9XLT8dIuuvmeSh/f3FU2KF7q4m11nf/PJivEuplO9U4tZDUW0JPPByW2VHOU2HMQ=="}
+    token_ttl_seconds: 600
+  session:
+    secret: ${APP_SESSION_SECRET:mysupersecuresecretkey1234567890!!!}
+    ttl-seconds: 21600
+    token-ttl-seconds: 1800
+
+jwt:
+  issuer: festora-auth
+  audience: festora-internal
+  access-token-ttl-minutes: 15
+  public-key: |
+    -----BEGIN PUBLIC KEY-----
+    MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAv7XcyPyxL/Lyj+5m2nW8
+    9FUtT/4NMyAos+Qr360UQGlXF+bR0gXErDo/6CNCnMZyfqbeE4Z2dfoyekRBwBS3
+    mHsQGSgXphJnJlVewj6nniWxwIsaSgFxizryLGW7QlRno5F3slgDy+/3VJYruCDR
+    7aZgPMVTcG6drhXOdD+zarHns3+9X3CzWD5eu4b9pQOv/J/VqyRjJ2JOSy9jqtJk
+    Q2hF/cs2zGjCIJwclEL8q9CiBQyAgxuTk8wb0SHcbPgcV7NRhY6q4G5wpwGxZgqR
+    yhUtS/SxoeFLkuLUf0gVryhklIJM3yEP4UzTj3hyI+dwJpJm3150eyMI1zFyokJ+
+    swIDAQAB
+    -----END PUBLIC KEY-----
+  private-key: |
+    -----BEGIN PRIVATE KEY-----
+    MIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQC/tdzI/LEv8vKP
+    7mbadbz0VS1P/g0zICiz5CvfrRRAaVcX5tHSBcSsOj/oI0KcxnJ+pt4ThnZ1+jJ6
+    REHAFLeYexAZKBemEmcmVV7CPqeeJbHAixpKAXGLOvIsZbtCVGejkXeyWAPL7/dU
+    liu4INHtpmA8xVNwbp2uFc50P7Nqseezf71fcLNYPl67hv2lA6/8n9WrJGMnYk5L
+    L2Oq0mRDaEX9yzbMaMIgnByUQvyr0KIFDICDG5OTzBvRIdxs+BxXs1GFjqrgbnCn
+    AbFmCpHKFS1L9LGh4UuS4tR/SBWvKGSUgkzfIQ/hTNOPeHIj53AmkmbfXnR7IwjX
+    MXKiQn6zAgMBAAECggEAPmk+1OHK71C43dmfe1xcJPD73PBYrL258oKEM//dOXDx
+    zRK0WRrOocEe3/xmqbJDQO8jGhkqxJKszzgcbaNw97+MiJwQQtz33rdpL3SFTgt4
+    eDXw24nnxItunryJv3jJ+qqXXKShq8lV7CAtYHay0Rradr5IwTAJvkxUF21LhB6R
+    NuV0kkUuzzz27jY6dJlP5Ev+gDF5nvIxYQMEieK6+zi7NU8nf514otU7l2QO/atx
+    H5/ohyeGf1V+By1zmZluuj5dfhWLeYk6g0zeEm4/66EuEJYEJwDID4Gxaj3T0laY
+    SxuUnaC+BGRuFGZXK6wwbOd1AYvMjUrTnO/liwmDYQKBgQDtkIPt4L4Uc/OyzDZj
+    fUxw2QyvfqsPtnY5UFRqeJwOlUrR15pWI7hBR2y3bcyxKUzaRVXBpHYyYoyoYK7P
+    3/ifSRr+MytbjcCNR3n8vETM72T5qvGP0TtkQSuyYPnLTNyf8s77lag6qMODQO8a
+    TAzbtf1UjD7XH+rSEbxgrYuxoQKBgQDOlmdkWV3RfdfB3EhqwAHTPp8VltNOmb0A
+    Nqun1u2kREiDHf9WP/DCgIcYWb46pI5dnOSb7bKmA1i9chl4AuEwCmyhC2cWuUdE
+    nGa/IOeSQcAoYHzhgFdMftb5FVV1hgqVSDJyq83ApbbD8nPrIMi7ALN6QhNYQRZz
+    VP4bxAW30wKBgQDUMpDVazj99fCJFcXDKkmcRxQAsglEOLvzR+CPVfo3QH0bYRUX
+    ukI79PuUALykxnpCQUpvdGKrcMGpKOsc/TcLuHYm9zfUSJLk3yKEcPqXf4JXTK0G
+    xGLjkx7f76VQRfCP4oely7D/7HzvAZJRj/qwSiflXHxJFdZfG76DMKEl4QKBgQC6
+    a2ijWi1Z9Kg0zNYgVmGPQWwG7FKEFCFERxFBZKaPW/rfLruSFiLpMVg3Ngx+GK5L
+    dV+qAaX7PvveAE9RR6/zTQTXklWVYN4Z4NSq1kOBbIm9JcyrJMgiRDczD/hNFAcK
+    zNqRNc12cVNqoKfP3oakkS5kPan9MsbSjji7z3ildwKBgFv1fnJUz6C6ftzaygrN
+    OHPTFZ6KnbWZUTvnQKJKGpdWZsbbsP8TIpu6Y8EeLZPhzR5i1PuLRx3i2ZyvvQ+Q
+    avlsAEW0iAa9oxoC5CuThwz89tspWPqeMJwGmxVmWGZ71Q3rUtDOOOMXeWBLWRJ2
+    3kKB+axGNif3btVLQFU5ThQR
+    -----END PRIVATE KEY-----
+
+# Menu / AWS Configs
+supabase:
+  endpoint: ${S3_ENDPOINT:https://jryaafvfzhnksekujawl.storage.supabase.co/storage/v1/s3}
+  region: ${S3_REGION:ap-south-1}
+  bucket: ${S3_NAME:images}
+  access-key: ${ACCESS_KEY:60330f356bb38c7a65d120a4750f6e04}
+  secret-key: ${SECRET_KEY:2878cd4cf1d0fb5e1b67643f3e4b40838ff13c1929c1526ec2fbf00bdd6726bb}
+
+# Management / Health
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      show-details: always

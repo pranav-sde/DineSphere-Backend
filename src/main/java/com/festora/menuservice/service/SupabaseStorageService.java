@@ -1,0 +1,61 @@
+package com.festora.menuservice.service;
+
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Service;
+import org.springframework.web.multipart.MultipartFile;
+import software.amazon.awssdk.core.sync.RequestBody;
+import software.amazon.awssdk.services.s3.S3Client;
+import software.amazon.awssdk.services.s3.model.GetObjectRequest;
+import software.amazon.awssdk.services.s3.model.PutObjectRequest;
+import software.amazon.awssdk.services.s3.presigner.S3Presigner;
+import software.amazon.awssdk.services.s3.presigner.model.GetObjectPresignRequest;
+import java.time.Duration;
+import java.util.UUID;
+
+@Service
+public class SupabaseStorageService {
+
+    private final S3Client s3;
+    private final S3Presigner presigner;
+
+    @Value("${supabase.bucket}")
+    private String bucket;
+
+    public SupabaseStorageService(S3Client s3, S3Presigner presigner) {
+        this.s3 = s3;
+        this.presigner = presigner;
+    }
+
+    public String upload(MultipartFile file) throws Exception {
+
+        String key = UUID.randomUUID() + "-" + file.getOriginalFilename();
+
+        s3.putObject(
+                PutObjectRequest.builder()
+                        .bucket(bucket)
+                        .key(key)
+                        .contentType(file.getContentType())
+                        .build(),
+                RequestBody.fromBytes(file.getBytes())
+        );
+
+        return key;
+    }
+
+    public String getSignedUrl(String key) {
+
+        GetObjectRequest get = GetObjectRequest.builder()
+                .bucket(bucket)
+                .key(key)
+                .build();
+
+        GetObjectPresignRequest request = GetObjectPresignRequest.builder()
+                .signatureDuration(Duration.ofMinutes(60))
+                .getObjectRequest(get)
+                .build();
+
+        return presigner.presignGetObject(request)
+                .url()
+                .toString();
+    }
+}
