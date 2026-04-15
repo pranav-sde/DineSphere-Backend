@@ -1,5 +1,5 @@
 server:
-  port: 8083
+  port: ${PORT:8083}
 
 spring:
   application:
@@ -15,7 +15,7 @@ spring:
 # Auth Service Configs
 app:
   qr:
-    secret: ${APP_QR_SECRET:"TnsLD53NKeFsHhZ73ojREN9XLT8dIuuvmeSh/f3FU2KF7q4m11nf/PJivEuplO9U4tZDUW0JPPByW2VHOU2HMQ=="}
+    secret: ${APP_QR_SECRET:TnsLD53NKeFsHhZ73ojREN9XLT8dIuuvmeSh/f3FU2KF7q4m11nf/PJivEuplO9U4tZDUW0JPPByW2VHOU2HMQ==}
     token_ttl_seconds: 600
   session:
     secret: ${APP_SESSION_SECRET:mysupersecuresecretkey1234567890!!!}
