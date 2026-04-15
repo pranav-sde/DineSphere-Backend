@@ -11,8 +11,7 @@ import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 import java.util.concurrent.atomic.AtomicReference;
 
 @RestController
-@RequestMapping("/menu")
-@RequestMapping("/api/images")
+@RequestMapping("/menu/api/images")
 public class ImageController {
 
     private final SupabaseStorageService storage;

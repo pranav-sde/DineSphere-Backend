@@ -3,6 +3,7 @@ package com.festora.orderservice.service;
 import com.festora.orderservice.client.InventoryClient;
 import com.festora.orderservice.client.MenuClient;
 import com.festora.orderservice.dto.*;
+import com.festora.monolith.dto.MenuItemRedis;
 import com.festora.orderservice.dto.event.InventoryConsumerEvent;
 import com.festora.orderservice.dto.event.OrderCancelledProducerEvent;
 import com.festora.orderservice.enums.OrderStatus;
@@ -32,7 +33,7 @@ public class OrderService {
     private final OrderRepository orderRepository;
     private final InventoryClient inventoryClient;
     private final GstCalculator gstCalculator;
-    private final com.festora.orderservice.repository.MenuRedisRepository menuRedisRepo;
+    private final com.festora.orderservice.repository.OrderMenuRedisRepository menuRedisRepo;
     private final MenuClient menuClient;
 
     @Caching(evict = {

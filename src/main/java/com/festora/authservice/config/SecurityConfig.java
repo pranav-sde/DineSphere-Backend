@@ -1,6 +1,7 @@
 package com.festora.authservice.config;
 
 import com.festora.authservice.filter.JwtAuthenticationFilter;
+import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
@@ -12,6 +13,15 @@ import org.springframework.security.web.SecurityFilterChain;
 @Configuration
 @EnableWebSecurity
 public class SecurityConfig {
+
+    private static final String[] WHITELIST = {
+            "/auth/**",
+            "/menu/**",
+            "/cart/health",
+            "/order/health",
+            "/inventory/health",
+            "/actuator/**"
+    };
 
     @Bean
     public SecurityFilterChain securityFilterChain(
@@ -40,21 +50,15 @@ public class SecurityConfig {
                         sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS)
                 )
 
+                .exceptionHandling(ex -> ex
+                        .authenticationEntryPoint((request, response, authException) -> {
+                            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                            response.getWriter().write("Unauthorized: Full authentication is required to access this resource");
+                        })
+                )
+
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers(
-                                "/auth/login",
-                                "/auth/register",
-                                "/auth/health",
-                                "/auth/session/**",
-                                "/menu/health",
-                                "/menu/items",
-                                "/menu/items-by-category",
-                                "/menu/categories",
-                                "/cart/health",
-                                "/order/health",
-                                "/inventory/health",
-                                "/actuator/**"
-                        ).permitAll()
+                        .requestMatchers(WHITELIST).permitAll()
                         .requestMatchers(org.springframework.http.HttpMethod.OPTIONS, "/**").permitAll()
                         .anyRequest().authenticated()
                 )

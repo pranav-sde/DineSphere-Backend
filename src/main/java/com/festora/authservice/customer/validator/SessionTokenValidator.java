@@ -19,7 +19,7 @@ public class SessionTokenValidator {
 
     @PostConstruct
     void init() {
-        key = Keys.hmacShaKeyFor(secret.getBytes());
+        key = Keys.hmacShaKeyFor(secret.getBytes(java.nio.charset.StandardCharsets.UTF_8));
     }
 
     public Claims validate(String token) {

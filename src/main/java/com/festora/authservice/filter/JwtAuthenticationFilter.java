@@ -26,15 +26,9 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                                     HttpServletResponse response, FilterChain filterChain) throws java.io.IOException, jakarta.servlet.ServletException {
 
         String path = request.getRequestURI();
-        
-        // Skip for public endpoints (already handled by SecurityConfig, but extra layer)
-        if (isPublicPath(path)) {
-            filterChain.doFilter(request, response);
-            return;
-        }
-
         String authHeader = request.getHeader("Authorization");
 
+        // 1. If no token, just proceed (SecurityConfig will block if path is not public)
         if (authHeader == null || !authHeader.startsWith("Bearer ")) {
             filterChain.doFilter(request, response);
             return;
@@ -45,24 +39,27 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         try {
             Claims claims = jwtValidator.validate(token).getBody();
 
-            // 1. Extract Claims
+            // 2. Extract Claims Safely
             String sid = claims.get("sid", String.class);
-            if (sid == null) sid = claims.getSubject(); // for admin tokens
+            if (sid == null) sid = claims.getSubject();
             
-            Long restaurantId = claims.get("restaurantId", Long.class);
+            // Handle number conversion safely (Integer to Long)
+            Object ridObj = claims.get("restaurantId");
+            Long restaurantId = (ridObj instanceof Number) ? ((Number) ridObj).longValue() : null;
+            
             Integer tableNumber = claims.get("tableNumber", Integer.class);
             String deviceId = claims.get("deviceId", String.class);
             String role = claims.get("role", String.class);
 
-            // 2. Set Spring Security Authentication
+            // 3. Set Spring Security Authentication
             var authentication = new UsernamePasswordAuthenticationToken(
-                    sid,
+                    sid != null ? sid : "anonymous",
                     null,
                     List.of(() -> "ROLE_" + (role != null ? role : "CUSTOMER"))
             );
             SecurityContextHolder.getContext().setAuthentication(authentication);
 
-            // 3. Inject into Headers via Wrapper (for @RequestHeader compatibility)
+            // 4. Inject into Headers via Wrapper
             HeaderMapRequestWrapper wrappedRequest = new HeaderMapRequestWrapper(request);
             if (sid != null) wrappedRequest.addHeader("X-User-Id", sid);
             if (restaurantId != null) wrappedRequest.addHeader("X-Restaurant-Id", String.valueOf(restaurantId));
@@ -72,21 +69,26 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             filterChain.doFilter(wrappedRequest, response);
 
         } catch (Exception ex) {
+            // If token is invalid but path is public, we should still allow the request
+            // This prevents 403s on public paths caused by bad/expired tokens
             SecurityContextHolder.clearContext();
-            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+            
+            if (isPublicPath(path)) {
+                filterChain.doFilter(request, response);
+            } else {
+                response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                response.getWriter().write("Invalid or expired session token");
+            }
         }
     }
 
     private boolean isPublicPath(String path) {
-        return path.contains("/health") || 
-               path.contains("/login") || 
-               path.contains("/register") || 
-               path.contains("/session/start");
+        return path.startsWith("/auth/") ||
+               path.startsWith("/menu/") ||
+               path.endsWith("/health") ||
+               path.startsWith("/actuator/");
     }
 
-    /**
-     * Helper class to allow adding headers to HttpServletRequest.
-     */
     private static class HeaderMapRequestWrapper extends jakarta.servlet.http.HttpServletRequestWrapper {
         private final java.util.Map<String, String> headerMap = new java.util.HashMap<>();
 

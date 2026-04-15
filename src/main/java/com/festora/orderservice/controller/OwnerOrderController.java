@@ -10,7 +10,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 @RestController
-@RequestMapping("/owner")
+@RequestMapping("/order/owner")
 @RequiredArgsConstructor
 public class OwnerOrderController {
 

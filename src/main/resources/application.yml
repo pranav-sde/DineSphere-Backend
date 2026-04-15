@@ -1,5 +1,5 @@
 server:
-  port: 8080
+  port: 8083
 
 spring:
   application:
@@ -11,19 +11,6 @@ spring:
     redis:
       url: ${REDIS_URL:rediss://default:ASUXAAImcDE1ODdhYWZiYjE2MDA0YmIzYjEwYWU5OTQzMDU2OTZkZHAxOTQ5NQ@talented-fawn-9495.upstash.io:6379}
       timeout: 50s
-
-  kafka:
-    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
-    consumer:
-      group-id: food-qr-group
-      auto-offset-reset: earliest
-      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
-      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
-      properties:
-        spring.json.trusted.packages: "*"
-    producer:
-      key-serializer: org.apache.kafka.common.serialization.StringSerializer
-      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
 
 # Auth Service Configs
 app:
@@ -87,7 +74,6 @@ supabase:
   access-key: ${ACCESS_KEY:60330f356bb38c7a65d120a4750f6e04}
   secret-key: ${SECRET_KEY:2878cd4cf1d0fb5e1b67643f3e4b40838ff13c1929c1526ec2fbf00bdd6726bb}
 
-# Management / Health
 management:
   endpoints:
     web:

@@ -2,7 +2,8 @@ package com.festora.cartservice.client;
 
 import com.festora.menuservice.service.MenuValidationService;
 import com.festora.cartservice.dto.MenuValidationResult;
-import com.festora.cartservice.dto.client.MenuItemRedis;
+import com.festora.cartservice.model.AddonSnapshot;
+import com.festora.cartservice.model.VariantSnapshot;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -44,13 +45,13 @@ public class MenuClient {
                 .itemName(response.getItemName())
                 .variantPrice(response.getVariantPrice())
                 .variant(response.getVariant() != null ? 
-                    MenuItemRedis.VariantSnapshot.builder()
+                    VariantSnapshot.builder()
                         .variantId(response.getVariant().getVariantId())
                         .label(response.getVariant().getLabel())
                         .build() : null)
                 .addons(response.getAddons() != null ? 
                     response.getAddons().stream().map(a -> 
-                        MenuItemRedis.AddonSnapshot.builder()
+                        AddonSnapshot.builder()
                             .addonId(a.getAddonId())
                             .name(a.getName())
                             .price(a.getPrice())

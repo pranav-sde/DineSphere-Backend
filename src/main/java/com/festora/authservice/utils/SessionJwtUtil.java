@@ -12,14 +12,14 @@ import java.util.Date;
 @Component
 public class SessionJwtUtil {
 
-    @Value("${app.qr.secret}")
-    private String qrSecret;
+    @Value("${app.session.secret}")
+    private String sessionSecret;
 
     private Key key;
 
     @PostConstruct
     void init() {
-        key = Keys.hmacShaKeyFor(qrSecret.getBytes());
+        key = Keys.hmacShaKeyFor(sessionSecret.getBytes(java.nio.charset.StandardCharsets.UTF_8));
     }
 
     public String createSessionToken(
@@ -37,7 +37,7 @@ public class SessionJwtUtil {
                 .claim("deviceId", deviceId)
                 .setIssuedAt(new Date(now))
                 .setExpiration(new Date(now + 1800_000))
-                .signWith(key)
+                .signWith(key, SignatureAlgorithm.HS256)
                 .compact();
     }
 }

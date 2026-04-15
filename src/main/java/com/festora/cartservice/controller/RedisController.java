@@ -8,9 +8,9 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 public class RedisController {
 
-    private final RedisTemplate<String, Cart> redisTemplate;
-
-    public RedisController(RedisTemplate<String, Cart> redisTemplate) {
+    private final RedisTemplate<String, Object> redisTemplate;
+ 
+    public RedisController(RedisTemplate<String, Object> redisTemplate) {
         this.redisTemplate = redisTemplate;
     }
 

@@ -21,8 +21,8 @@ public class JwtUtil {
 
     @PostConstruct
     public void init(){
-        this.qrKey = Keys.hmacShaKeyFor(qrSecret.getBytes());
-        this.sessionKey = Keys.hmacShaKeyFor(sessionSecret.getBytes());
+        this.qrKey = Keys.hmacShaKeyFor(qrSecret.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        this.sessionKey = Keys.hmacShaKeyFor(sessionSecret.getBytes(java.nio.charset.StandardCharsets.UTF_8));
     }
 
     // Validate QR token (throws JwtException on invalid)

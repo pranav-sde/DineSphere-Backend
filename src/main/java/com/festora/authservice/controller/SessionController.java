@@ -12,7 +12,7 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.bind.annotation.RequestHeader;
 
 @RestController
-@RequestMapping("/session")
+@RequestMapping("/auth/session")
 @RequiredArgsConstructor
 public class SessionController {
 
@@ -21,7 +21,12 @@ public class SessionController {
     public SessionStartResponse start(
             @RequestBody SessionStartRequest request,
             HttpServletRequest req) {
-        return sessionService.startSession(request, req);
+        try {
+            return sessionService.startSession(request, req);
+        } catch (Exception e) {
+            System.out.println(e.getMessage());
+            return null;
+        }
     }
 }
 

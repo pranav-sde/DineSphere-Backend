@@ -5,6 +5,7 @@ import com.festora.authservice.customer.dto.SessionData;
 import com.festora.authservice.customer.validator.SessionStore;
 import com.festora.authservice.customer.validator.SessionTokenValidator;
 import io.jsonwebtoken.Claims;
+
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -29,16 +30,27 @@ public class SessionValidationFilter extends OncePerRequestFilter {
             FilterChain filterChain
     ) throws ServletException, IOException {
 
+        String uri = request.getRequestURI();
+
+        // Admin / owner tokens arrive via "Authorization: Bearer <RSA-token>".
+        // JwtAuthenticationFilter handles those — skip this filter entirely for that flow.
+        String authHeader = request.getHeader("Authorization");
+        if (authHeader != null && authHeader.startsWith("Bearer ")) {
+            filterChain.doFilter(request, response);
+            return;
+        }
+
+        // Customer flow uses X-Session-Token
         String token = request.getHeader("X-Session-Token");
 
-        // Allow session start and admin auth endpoints without customer token
-        String uri = request.getRequestURI();
-        if (uri.startsWith("/session") || uri.startsWith("/auth/session") || 
-            uri.startsWith("/login") || uri.startsWith("/auth/login") || 
-            uri.startsWith("/health") || uri.startsWith("/auth/health") || 
-            uri.startsWith("/register") || uri.startsWith("/auth/register") || 
-            uri.startsWith("/admin") || uri.startsWith("/auth/admin") || 
-            uri.startsWith("/owner") || uri.startsWith("/auth/owner")) {
+        // Allow whitelisted public endpoints without a session token
+        if (uri.startsWith("/auth/login") ||
+                uri.startsWith("/auth/refresh") ||
+                uri.startsWith("/auth/logout") ||
+                uri.startsWith("/auth/session/start") ||
+                uri.startsWith("/menu/") ||
+                uri.startsWith("/actuator/") ||
+                uri.endsWith("/health")) {
             filterChain.doFilter(request, response);
             return;
         }
@@ -66,8 +78,6 @@ public class SessionValidationFilter extends OncePerRequestFilter {
 
         } catch (Exception e) {
             response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Invalid session");
-        } finally {
-            SessionContext.clear();
         }
     }
 }

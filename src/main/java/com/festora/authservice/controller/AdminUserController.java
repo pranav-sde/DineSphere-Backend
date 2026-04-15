@@ -9,7 +9,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
-@RequestMapping("/admin/users")
+@RequestMapping("/auth/admin/users")
 @RequiredArgsConstructor
 public class AdminUserController {
 

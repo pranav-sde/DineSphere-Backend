@@ -1,8 +1,8 @@
 package com.festora.authservice.customer.validator;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.festora.authservice.customer.dto.SessionData;
 import lombok.RequiredArgsConstructor;
-import org.apache.commons.lang3.ObjectUtils;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Component;
 
@@ -11,27 +11,33 @@ import org.springframework.stereotype.Component;
 public class SessionStore {
 
     private final StringRedisTemplate redis;
+    private final ObjectMapper mapper;
 
     public SessionData get(String sessionId) {
         String key = "session:" + sessionId;
 
-        if (!redis.hasKey(key)) {
+        String json = redis.opsForValue().get(key);
+        if (json == null || json.isBlank()) {
             return null;
         }
 
-        Object restaurant = redis.opsForHash().get(key, "restaurantId");
-        Object table = redis.opsForHash().get(key, "tableNumber");
         try {
-            if (ObjectUtils.isNotEmpty(restaurant) && ObjectUtils.isNotEmpty(table)) {
-                Long restaurantId = Long.parseLong(restaurant.toString());
-                Integer tableNumber = Integer.parseInt(table.toString());
-                return new SessionData(sessionId, restaurantId, tableNumber);
-            }
+            @SuppressWarnings("unchecked")
+            java.util.Map<String, Object> data = mapper.readValue(json, java.util.Map.class);
+
+            Object restaurantRaw = data.get("restaurantId");
+            Object tableRaw     = data.get("tableNumber");
+
+            if (restaurantRaw == null || tableRaw == null) return null;
+
+            Long    restaurantId = Long.parseLong(restaurantRaw.toString());
+            Integer tableNumber  = Integer.parseInt(tableRaw.toString());
+
+            return new SessionData(sessionId, restaurantId, tableNumber);
+
+        } catch (Exception e) {
+            System.out.println("SessionStore parse error: " + e.getMessage());
+            return null;
         }
-        catch (Exception ignore) {
-            System.out.println("NumberFormat Exception : " + ignore.getMessage());
-        }
-        return null;
     }
 }
-

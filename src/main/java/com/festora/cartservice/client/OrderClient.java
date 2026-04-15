@@ -18,7 +18,7 @@ public class OrderClient {
 
     private final OrderService orderService;
 
-    public Object createOrder(OrderCreateRequest request) {
+    public Object createOrder(OrderCreateRequest request) throws Exception {
         log.info("Directly calling OrderService.createOrder for session: {}", request.getUserId());
 
         // Map to OrderService DTO

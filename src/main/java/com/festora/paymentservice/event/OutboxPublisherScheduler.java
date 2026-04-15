@@ -2,7 +2,7 @@ package com.festora.paymentservice.event;
 
 import com.festora.paymentservice.model.PaymentOutbox;
 import com.festora.paymentservice.repository.PaymentOutboxRepository;
-import jakarta.transaction.Transactional;
+import org.springframework.transaction.annotation.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;

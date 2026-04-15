@@ -1,7 +1,7 @@
 package com.festora.orderservice.repository;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.festora.orderservice.dto.MenuItemRedis;
+import com.festora.monolith.dto.MenuItemRedis;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.RedisTemplate;
@@ -12,7 +12,7 @@ import java.util.Optional;
 @Repository
 @RequiredArgsConstructor
 @Slf4j
-public class MenuRedisRepository {
+public class OrderMenuRedisRepository {
 
     private final RedisTemplate<String, Object> redisTemplate;
     private final ObjectMapper objectMapper;

@@ -60,6 +60,7 @@ public class CustomerSessionService {
 
         if (sessionId != null) {
             final String sessionKey = "session:" + sessionId;
+
             if (redis.hasKey(sessionKey)) {
                 redis.expire(linkKey, expiry);
                 redis.expire(sessionKey, expiry);

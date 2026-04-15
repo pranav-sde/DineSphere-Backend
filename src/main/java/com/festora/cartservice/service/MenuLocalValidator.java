@@ -1,10 +1,10 @@
 package com.festora.cartservice.service;
 
 import com.festora.cartservice.dto.MenuValidationResult;
-import com.festora.cartservice.dto.client.MenuItemRedis;
+import com.festora.monolith.dto.MenuItemRedis;
 import com.festora.cartservice.model.AddonSnapshot;
 import com.festora.cartservice.model.VariantSnapshot;
-import com.festora.cartservice.repository.MenuRedisRepository;
+import com.festora.cartservice.repository.CartMenuRedisRepository;
 import com.festora.cartservice.client.MenuClient;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -19,7 +19,7 @@ import java.util.stream.Collectors;
 @Slf4j
 public class MenuLocalValidator {
 
-    private final MenuRedisRepository menuRedisRepo;
+    private final CartMenuRedisRepository menuRedisRepo;
     private final MenuClient menuClient; // Keep for fallback initially
 
     public MenuValidationResult validate(Long restaurantId, String menuItemId, String variantId, List<String> addonIds) {
