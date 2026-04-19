@@ -22,13 +22,16 @@ public class MenuItemController {
         return new ResponseEntity<>("Menu Service up", HttpStatus.OK);
     }
 
+    // ── Public: customers access without JWT, restaurantId comes from query param or header
     @GetMapping("/items-by-category")
     public ResponseEntity<MenuItemPageResponse> getItemsByCategory(
-            @RequestHeader("X-Restaurant-Id") Long restaurantId,
+            @RequestHeader(value = "X-Restaurant-Id", required = false) Long restaurantIdHeader,
+            @RequestParam(required = false) Long restaurantId,
             @RequestParam String categoryId
     ) {
+        Long rid = restaurantIdHeader != null ? restaurantIdHeader : restaurantId;
         try {
-            MenuItemPageResponse response = menuItemService.getMenuItemsResponse(restaurantId, categoryId);
+            MenuItemPageResponse response = menuItemService.getMenuItemsResponse(rid, categoryId);
             return new ResponseEntity<>(response, HttpStatus.OK);
         } catch (Exception e) {
             System.out.println(e.getMessage());
@@ -90,13 +93,17 @@ public class MenuItemController {
         return ResponseEntity.ok().build();
     }
 
+    // ── Public: customers browse the full menu
     @GetMapping("/items")
-    public ResponseEntity<MenuItemPageResponse> getItems(@RequestHeader("X-Restaurant-Id") Long restaurantId) {
+    public ResponseEntity<MenuItemPageResponse> getItems(
+            @RequestHeader(value = "X-Restaurant-Id", required = false) Long restaurantIdHeader,
+            @RequestParam(required = false) Long restaurantId
+    ) {
+        Long rid = restaurantIdHeader != null ? restaurantIdHeader : restaurantId;
         try {
-            MenuItemPageResponse response = menuItemService.getMenuItemsResponse(restaurantId, null);
+            MenuItemPageResponse response = menuItemService.getMenuItemsResponse(rid, null);
             return ResponseEntity.ok(response);
-        }
-        catch (Exception e) {
+        } catch (Exception e) {
             System.out.println(e.getMessage());
         }
         return new ResponseEntity<>(HttpStatus.BAD_REQUEST);

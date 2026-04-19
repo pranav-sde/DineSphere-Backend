@@ -3,10 +3,7 @@ package com.festora.menuservice.controller;
 import com.festora.menuservice.dto.CategoryMenuResponse;
 import com.festora.menuservice.service.MenuOverviewService;
 import lombok.RequiredArgsConstructor;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestHeader;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/menu/overview")
@@ -17,8 +14,10 @@ public class MenuOverviewController {
 
     @GetMapping
     public CategoryMenuResponse getMenuOverview(
-            @RequestHeader("X-Restaurant-Id") Long restaurantId
+            @RequestHeader(value = "X-Restaurant-Id", required = false) Long restaurantIdHeader,
+            @RequestParam(required = false) Long restaurantId
     ) {
-        return menuOverviewService.getMenuOverview(restaurantId);
+        Long rid = restaurantIdHeader != null ? restaurantIdHeader : restaurantId;
+        return menuOverviewService.getMenuOverview(rid);
     }
 }

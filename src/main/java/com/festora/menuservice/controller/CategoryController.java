@@ -15,7 +15,7 @@ public class CategoryController {
     private final CategoryService categoryService;
 
     @GetMapping
-    public List<CategoryDto> getCategories(@RequestHeader("X-Restaurant-Id") Long restaurantId) {
+    public List<CategoryDto> getCategories(@RequestHeader(value = "X-Restaurant-Id", required = false) Long restaurantId) {
         return categoryService.getCategories(restaurantId);
     }
 
