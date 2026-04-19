@@ -4,13 +4,16 @@ import com.festora.cartservice.dto.AddToCartRequest;
 import com.festora.cartservice.dto.CheckoutRequest;
 import com.festora.cartservice.dto.MenuValidationResult;
 import com.festora.cartservice.dto.UpdateCartItemRequest;
-import com.festora.cartservice.dto.client.OrderCreateRequest;
-import com.festora.cartservice.dto.client.OrderItem;
 import com.festora.cartservice.model.AddonSnapshot;
 import com.festora.cartservice.model.Cart;
 import com.festora.cartservice.model.CartItem;
 import com.festora.cartservice.repository.CartRedisRepository;
+import com.festora.orderservice.dto.CreateOrderRequest;
+import com.festora.orderservice.model.Order;
+import com.festora.orderservice.model.OrderItem;
+import com.festora.orderservice.service.OrderService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.util.ObjectUtils;
 
@@ -18,11 +21,12 @@ import java.util.*;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class CartService {
 
     private final CartRedisRepository cartRepo;
     private final MenuLocalValidator menuValidator;
-    private final OrderRedisProducer orderProducer;
+    private final OrderService orderService;
 
     private String buildKey(CheckoutRequest request) {
         if (ObjectUtils.isEmpty(request))
@@ -242,14 +246,14 @@ public class CartService {
         try {
             cart = cartRepo.get(key);
         } catch (Exception e) {
-            System.out.println(e.getMessage());
+            log.error("Failed to retrieve cart: {}", e.getMessage());
             throw new NoSuchElementException("Cart not found");
         }
         if (cart == null || cart.getItems().isEmpty()) {
             throw new IllegalStateException("Cart expired or empty");
         }
 
-        // Final menu re-validation (NO price recalculation) using Redis
+        // Step 1: Final menu re-validation (no price recalculation)
         cart.getItems().forEach(item ->
                 menuValidator.validate(
                         req.getRestaurantId(),
@@ -257,55 +261,65 @@ public class CartService {
                         item.getVariant() == null ? null : item.getVariant().getVariantId(),
                         item.getAddons()
                                 .stream()
-                                .map(a -> a.getAddonId())
+                                .map(AddonSnapshot::getAddonId)
                                 .toList()
                 )
         );
 
-        // Build Order request snapshot
-        OrderCreateRequest orderRequest =
-                OrderCreateRequest.builder()
-                        .restaurantId(cart.getRestaurantId())
-                        .tableNumber(req.getTableNumber())
-                        .userId(cart.getUserId())
-                        .orderId(UUID.randomUUID().toString())
-                        .deviceId(req.getDeviceId())
-                        .subtotal(cart.getSubtotal())
-                        .items(
-                                cart.getItems().stream()
-                                        .map(item -> OrderItem.builder()
-                                                .menuItemId(item.getMenuItemId())
-                                                .variantId(
-                                                        item.getVariant() == null
-                                                                ? null
-                                                                : item.getVariant().getVariantId()
-                                                )
-                                                .addonIds(
-                                                        item.getAddons().stream()
-                                                                .map(AddonSnapshot::getAddonId)
-                                                                .toList()
-                                                )
-                                                .unitPrice(item.getUnitPrice())
-                                                .quantity(item.getQuantity())
-                                                .totalPrice(item.getTotalPrice())
-                                                .build()
-                                        )
-                                        .toList()
+        // Step 2: Build CreateOrderRequest for OrderService
+        String generatedOrderId = UUID.randomUUID().toString();
+        CreateOrderRequest orderRequest = new CreateOrderRequest();
+        orderRequest.setOrderId(generatedOrderId);
+        orderRequest.setRestaurantId(cart.getRestaurantId());
+        orderRequest.setTableNumber(req.getTableNumber());
+        orderRequest.setUserId(cart.getUserId());
+        orderRequest.setDeviceId(req.getDeviceId());
+        orderRequest.setSubtotal(cart.getSubtotal());
+        orderRequest.setItems(
+                cart.getItems().stream()
+                        .map(item -> OrderItem.builder()
+                                .menuItemId(item.getMenuItemId())
+                                .variantId(
+                                        item.getVariant() == null
+                                                ? null
+                                                : item.getVariant().getVariantId()
+                                )
+                                .addonIds(
+                                        item.getAddons().stream()
+                                                .map(AddonSnapshot::getAddonId)
+                                                .toList()
+                                )
+                                .unitPrice(item.getUnitPrice())
+                                .quantity(item.getQuantity())
+                                .totalPrice(item.getTotalPrice())
+                                .build()
                         )
-                        .build();
+                        .toList()
+        );
 
-        // Call Order Service via Redis (Async)
-        orderProducer.submitOrder(orderRequest);
+        // Step 3: Directly call OrderService — saves order as CREATED, checks inventory,
+        //         then transitions to PENDING (or REJECTED on out-of-stock)
+        Order order;
+        try {
+            order = orderService.createOrder(orderRequest);
+        } catch (IllegalStateException e) {
+            // Inventory check failed — OUT_OF_STOCK
+            log.warn("Checkout failed: inventory issue for cart key={}: {}", key, e.getMessage());
+            throw e;
+        } catch (Exception e) {
+            log.error("Checkout failed unexpectedly: {}", e.getMessage(), e);
+            throw new RuntimeException("Order creation failed: " + e.getMessage(), e);
+        }
 
-        // Build Response
-        Map<String, Object> response = new HashMap<>();
-        response.put("orderId", orderRequest.getOrderId());
-        response.put("status", "PENDING");
-        response.put("message", "Order submitted successfully");
-
-        // Clear cart only on submission
+        // Step 4: Clear cart only after successful order creation
         cartRepo.delete(key);
+        log.info("Checkout successful. orderId={} status={}", order.getOrderId(), order.getStatus());
 
+        // Step 5: Build response
+        Map<String, Object> response = new HashMap<>();
+        response.put("orderId", order.getOrderId());
+        response.put("status", order.getStatus().name());
+        response.put("message", "Order placed successfully");
         return response;
     }
 }
