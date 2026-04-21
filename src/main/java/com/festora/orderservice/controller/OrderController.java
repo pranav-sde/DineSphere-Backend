@@ -80,7 +80,7 @@ public class OrderController {
 //        return ResponseEntity.ok().build();
 //    }
 
-    @PostMapping("/{orderId}/served")
+    @GetMapping("/{orderId}/served")
     public ResponseEntity<Void> markServed(@PathVariable String orderId) {
         orderService.markServed(orderId);
         return ResponseEntity.ok().build();

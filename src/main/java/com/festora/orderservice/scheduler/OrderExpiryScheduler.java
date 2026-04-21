@@ -26,6 +26,8 @@ public class OrderExpiryScheduler {
         List<Order> expiredOrders =
                 orderRepo.findByStatusInAndUpdatedAtBefore(
                         List.of(
+                                OrderStatus.CREATED,
+                                OrderStatus.PENDING,
                                 OrderStatus.PAYMENT_PENDING,
                                 OrderStatus.PREPARING
                         ),
