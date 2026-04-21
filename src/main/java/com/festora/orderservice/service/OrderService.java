@@ -319,7 +319,7 @@ public class OrderService {
         order.setTotalAmount(base + gst.getTotalTax());
     }
 
-    @Cacheable(value = "singleOrder", key = "#orderId", unless = "#result == null")
+
     public Order getOrder(String orderId) {
         if (orderId == null) {
             return null;
