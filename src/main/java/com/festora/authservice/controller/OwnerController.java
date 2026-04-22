@@ -21,7 +21,8 @@ public class OwnerController {
     @GetMapping("/tables/bulk")
     public ResponseEntity<?> generateBulk(HttpServletRequest request, @RequestParam("start") Integer start, @RequestParam("end") Integer end) {
 
-        Long restaurantId = (Long) request.getAttribute("restaurantId");
+        String restaurantIdStr = request.getHeader("X-Restaurant-Id");
+        Long restaurantId = restaurantIdStr != null ? Long.valueOf(restaurantIdStr) : null;
 
         if (restaurantId == null) {
             return ResponseEntity.status(401).build();
