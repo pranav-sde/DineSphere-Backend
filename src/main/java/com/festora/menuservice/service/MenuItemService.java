@@ -28,7 +28,6 @@ public class MenuItemService {
 
     private final MenuItemRepository itemRepo;
     private final MenuMapper menuMapper;
-    private final MenuRedisSyncService redisSyncService;
 
     @Cacheable(
             value = "menuCache",
@@ -97,7 +96,6 @@ public class MenuItemService {
         entity.setUpdatedAt(System.currentTimeMillis());
 
         MenuItem saved = itemRepo.save(entity);
-        redisSyncService.syncMenuItem(saved);
         return menuMapper.toMenuItemDto(saved);
     }
 
@@ -118,7 +116,6 @@ public class MenuItemService {
         existing.setUpdatedAt(System.currentTimeMillis());
 
         MenuItem saved = itemRepo.save(existing);
-        redisSyncService.syncMenuItem(saved);
         return menuMapper.toMenuItemDto(saved);
     }
 
@@ -135,7 +132,6 @@ public class MenuItemService {
         item.setEnabled(enabled);
         item.setUpdatedAt(System.currentTimeMillis());
         MenuItem saved = itemRepo.save(item);
-        redisSyncService.syncMenuItem(saved);
     }
 
     public MenuItemPriceResponse calculateFinalPrice(MenuPriceRequest request) {
