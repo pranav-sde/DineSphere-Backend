@@ -31,9 +31,12 @@ public class OwnerOrderController {
             @PathVariable String orderId,
             @RequestBody UpdateOrderItemsRequest request
     ) {
-        return ResponseEntity.ok(
-                orderService.updateOrderItems(orderId, request)
-        );
+        try {
+            return ResponseEntity.ok(orderService.updateOrderItems(orderId, request));
+        } catch (Exception e) {
+            System.out.println(e.getMessage());
+            return ResponseEntity.badRequest().build();
+        }
     }
 
     @PostMapping("/{orderId}/finalize")
@@ -53,12 +56,13 @@ public class OwnerOrderController {
     }
 
     @GetMapping("/todays")
-    public ResponseEntity<List<Order>> getTodayOrders(@RequestHeader("X-Restaurant-Id") Long restaurantId){
-        try{
-            List<Order> todayOrders =  orderService.fetchTodaysAllOrders(restaurantId);
+    public ResponseEntity<List<Order>> getTodayOrders(@RequestHeader("X-Restaurant-Id") Long restaurantId) {
+        try {
+            List<Order> todayOrders = orderService.fetchTodaysAllOrders(restaurantId);
             return ResponseEntity.ok(todayOrders);
-        } catch (Exception e){
-          return ResponseEntity.badRequest().build();
+        } catch (Exception e) {
+            System.out.println(e.getMessage());
+            return ResponseEntity.badRequest().build();
         }
     }
 }
