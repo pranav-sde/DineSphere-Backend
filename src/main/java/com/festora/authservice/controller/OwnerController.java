@@ -12,14 +12,14 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.List;
 
 @RestController
-@RequestMapping("/qr")
+@RequestMapping("/auth/qr")
 @RequiredArgsConstructor
 public class OwnerController {
 
     private final OwnerService ownerService;
 
     @GetMapping("/tables/bulk")
-    public ResponseEntity<?> generateBulk(HttpServletRequest request, @RequestParam Integer start, @RequestParam Integer end) {
+    public ResponseEntity<?> generateBulk(HttpServletRequest request, @RequestParam("start") Integer start, @RequestParam("end") Integer end) {
 
         Long restaurantId = (Long) request.getAttribute("restaurantId");
 
