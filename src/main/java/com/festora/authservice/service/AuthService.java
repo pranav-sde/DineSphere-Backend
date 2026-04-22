@@ -57,6 +57,7 @@ public class AuthService {
         return AuthResponse.builder()
                 .accessToken(newAccess)
                 .refreshToken(newRefresh)
+                .expiresIn(jwtProperties.getAccessTokenTtlMinutes() * 60)
                 .build();
     }
 
