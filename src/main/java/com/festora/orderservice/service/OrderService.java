@@ -14,9 +14,6 @@ import com.festora.orderservice.repository.OrderRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
-import org.springframework.cache.annotation.CacheEvict;
-import org.springframework.cache.annotation.Cacheable;
-import org.springframework.cache.annotation.Caching;
 import org.springframework.stereotype.Service;
 import org.springframework.util.ObjectUtils;
 
@@ -33,13 +30,8 @@ public class OrderService {
     private final OrderRepository orderRepository;
     private final InventoryClient inventoryClient;
     private final GstCalculator gstCalculator;
-    private final com.festora.orderservice.repository.OrderMenuRedisRepository menuRedisRepo;
     private final MenuClient menuClient;
 
-    @Caching(evict = {
-            @CacheEvict(value = "todaysOrders", key = "#req.restaurantId"),
-            @CacheEvict(value = "activeOrders", key = "#req.restaurantId")
-    })
     public Order createOrder(CreateOrderRequest req) throws Exception {
         if (ObjectUtils.isEmpty(req)) {
             throw new Exception("Order request cant be empty");
@@ -134,11 +126,6 @@ public class OrderService {
     /* ===============================
         7️⃣ CANCEL ORDER (EXPIRY / ADMIN)
        =============================== */
-    @Caching(evict = {
-            @CacheEvict(value = "singleOrder", key = "#orderId"),
-            @CacheEvict(value = "todaysOrders", allEntries = true),
-            @CacheEvict(value = "activeOrders", allEntries = true)
-    })
     public void cancelOrder(String orderId, String reason) {
 
         Order order = get(orderId);
@@ -172,11 +159,6 @@ public class OrderService {
     /* ===============================
        STATE TRANSITION GUARD
        =============================== */
-    @Caching(evict = {
-            @CacheEvict(value = "singleOrder", key = "#orderId"),
-            @CacheEvict(value = "todaysOrders", allEntries = true),
-            @CacheEvict(value = "activeOrders", allEntries = true)
-    })
     public void transition(String orderId,
                            OrderStatus from,
                            OrderStatus to) {
@@ -245,41 +227,6 @@ public class OrderService {
     }
 
     private OrderItem populateWithMenuDetails(Long restaurantId, OrderItem item) {
-        Optional<MenuItemRedis> itemOpt = menuRedisRepo.getMenuItem(item.getMenuItemId());
-
-        if (itemOpt.isPresent()) {
-            MenuItemRedis detail = itemOpt.get();
-            double basePrice = detail.getBasePrice();
-            String variantName = null;
-
-            if (item.getVariantId() != null) {
-                MenuItemRedis.VariantRedis variant = detail.getVariants().stream()
-                        .filter(v -> v.getId().equals(item.getVariantId()))
-                        .findFirst()
-                        .orElseThrow(() -> new IllegalStateException("Invalid variant"));
-                basePrice = variant.getPrice();
-                variantName = variant.getLabel();
-            }
-
-            List<String> addonNames = List.of();
-            double addonsPrice = 0;
-            if (item.getAddonIds() != null) {
-                List<MenuItemRedis.AddonRedis> matchedAddons = detail.getAddons().stream()
-                        .filter(a -> item.getAddonIds().contains(a.getId()))
-                        .toList();
-                addonsPrice = matchedAddons.stream().mapToDouble(MenuItemRedis.AddonRedis::getPrice).sum();
-                addonNames = matchedAddons.stream().map(MenuItemRedis.AddonRedis::getName).toList();
-            }
-
-            item.setName(detail.getName());
-            item.setVariantName(variantName);
-            item.setAddonNames(addonNames);
-            item.setUnitPrice(basePrice + addonsPrice);
-            item.setTotalPrice(item.getUnitPrice() * item.getQuantity());
-            return item;
-        }
-
-        // Fallback to HTTP
         MenuItemPriceResponse price =
                 menuClient.getFinalPrice(
                         item.getMenuItemId(),
@@ -359,11 +306,6 @@ public class OrderService {
         return orderRepository.findOrdersByStatus(OrderStatus.PENDING);
     }
 
-    @Caching(evict = {
-            @CacheEvict(value = "singleOrder", key = "#orderId"),
-            @CacheEvict(value = "todaysOrders", allEntries = true),
-            @CacheEvict(value = "activeOrders", allEntries = true)
-    })
     public Order markOrderConfirm(String orderId) throws Exception {
         if (StringUtils.isBlank(orderId)) {
             throw new Exception("Invalid order id");
@@ -384,11 +326,6 @@ public class OrderService {
         return orderRepository.save(order);
     }
 
-    @Caching(evict = {
-            @CacheEvict(value = "singleOrder", key = "#orderId"),
-            @CacheEvict(value = "todaysOrders", allEntries = true),
-            @CacheEvict(value = "activeOrders", allEntries = true)
-    })
     public Order updateOrderItems(String orderId, UpdateOrderItemsRequest request) {
 
         Order order = get(orderId);
@@ -465,46 +402,6 @@ public class OrderService {
     }
 
     private OrderItem buildNewOrderItem(Order order, ItemUpdate update) {
-        Optional<MenuItemRedis> itemOpt = menuRedisRepo.getMenuItem(update.getMenuItemId());
-
-        if (itemOpt.isPresent()) {
-            MenuItemRedis detail = itemOpt.get();
-            double basePrice = detail.getBasePrice();
-            String variantName = null;
-
-            if (update.getVariantId() != null) {
-                MenuItemRedis.VariantRedis variant = detail.getVariants().stream()
-                        .filter(v -> v.getId().equals(update.getVariantId()))
-                        .findFirst()
-                        .orElseThrow(() -> new IllegalStateException("Invalid variant"));
-                basePrice = variant.getPrice();
-                variantName = variant.getLabel();
-            }
-
-            List<String> addonNames = List.of();
-            double addonsPrice = 0;
-            if (update.getAddonIds() != null) {
-                List<MenuItemRedis.AddonRedis> matchedAddons = detail.getAddons().stream()
-                        .filter(a -> update.getAddonIds().contains(a.getId()))
-                        .toList();
-                addonsPrice = matchedAddons.stream().mapToDouble(MenuItemRedis.AddonRedis::getPrice).sum();
-                addonNames = matchedAddons.stream().map(MenuItemRedis.AddonRedis::getName).toList();
-            }
-
-            return OrderItem.builder()
-                    .menuItemId(update.getMenuItemId())
-                    .name(detail.getName())
-                    .variantId(update.getVariantId())
-                    .variantName(variantName)
-                    .addonIds(update.getAddonIds())
-                    .addonNames(addonNames)
-                    .unitPrice(basePrice + addonsPrice)
-                    .quantity(update.getQuantity())
-                    .totalPrice((basePrice + addonsPrice) * update.getQuantity())
-                    .build();
-        }
-
-        // Fallback
         MenuItemPriceResponse detail =
                 menuClient.getFinalPrice(
                         update.getMenuItemId(),
@@ -543,11 +440,6 @@ public class OrderService {
                 .collect(Collectors.toList());
     }
 
-    @Caching(evict = {
-            @CacheEvict(value = "singleOrder", key = "#orderId"),
-            @CacheEvict(value = "todaysOrders", allEntries = true),
-            @CacheEvict(value = "activeOrders", allEntries = true)
-    })
     public Order finalizeOrder(String orderId) {
 
         Order order = get(orderId);
@@ -564,9 +456,8 @@ public class OrderService {
         return orderRepository.save(order);
     }
 
-    @Cacheable(value = "activeOrders", key = "#restaurantId")
     public List<Order> getActiveOwnerOrders(Long restaurantId) {
-        log.info("Cache MISS: fetching active orders from DB for restaurant {}", restaurantId);
+        log.info("Fetching active orders from DB for restaurant {}", restaurantId);
         return orderRepository.findByRestaurantIdAndStatusIn(restaurantId,
                 List.of(
                         OrderStatus.PENDING,
@@ -609,13 +500,12 @@ public class OrderService {
         }
     }
 
-    @Cacheable(value = "todaysOrders", key = "#restaurantId")
     public List<Order> fetchTodaysAllOrders(Long restaurantId) throws Exception {
         if (restaurantId == null) {
             throw new Exception("restaurantId is null");
         }
 
-        log.info("Cache MISS: fetching today's orders from DB for restaurant {}", restaurantId);
+        log.info("Fetching today's orders from DB for restaurant {}", restaurantId);
 
         ZoneId kolkataZone = ZoneId.of("Asia/Kolkata");
         LocalDate today = LocalDate.now(kolkataZone);

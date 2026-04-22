@@ -1,62 +1,51 @@
 package com.festora.authservice.config;
 
 import com.festora.authservice.exception.TooManyLoginAttemptsException;
-import org.springframework.data.redis.core.StringRedisTemplate;
+import com.festora.authservice.model.LoginAttempt;
+import com.festora.authservice.repository.LoginAttemptRepository;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
-import java.time.Duration;
+import java.util.Date;
 
 @Service
+@RequiredArgsConstructor
 public class LoginRateLimiter {
 
     private static final int MAX_ATTEMPTS = 5;
-    private static final Duration BLOCK_DURATION = Duration.ofMinutes(15);
+    private static final long BLOCK_DURATION_MILLIS = 15L * 60 * 1000; // 15 minutes
 
-    private final StringRedisTemplate redis;
-
-    public LoginRateLimiter(StringRedisTemplate redis) {
-        this.redis = redis;
-    }
+    private final LoginAttemptRepository attemptRepo;
 
     public void validateLoginAllowed(String email) {
-        String key = key(email);
-
-        try {
-            String attempts = redis.opsForValue().get(key);
-
-            if (attempts != null && Integer.parseInt(attempts) >= MAX_ATTEMPTS) {
-                throw new TooManyLoginAttemptsException();
+        attemptRepo.findByEmail(email.toLowerCase()).ifPresent(attempt -> {
+            if (attempt.getAttempts() >= MAX_ATTEMPTS) {
+                long elapsed = System.currentTimeMillis() - attempt.getLastModified().getTime();
+                if (elapsed < BLOCK_DURATION_MILLIS) {
+                    throw new TooManyLoginAttemptsException();
+                } else {
+                    // Reset if block duration passed
+                    attemptRepo.delete(attempt);
+                }
             }
-
-        } catch (Exception e) {
-            System.out.println("Redis unavailable, skipping rate limit: {}" + e.getMessage());
-        }
+        });
     }
 
     public void onLoginFailure(String email) {
-        String key = key(email);
+        String key = email.toLowerCase();
+        LoginAttempt attempt = attemptRepo.findByEmail(key).orElse(
+                LoginAttempt.builder()
+                        .email(key)
+                        .attempts(0)
+                        .build()
+        );
 
-        try {
-            Long count = redis.opsForValue().increment(key);
-
-            if (count != null && count == 1) {
-                redis.expire(key, BLOCK_DURATION);
-            }
-
-        } catch (Exception e) {
-            System.out.println("Redis unavailable, skipping failure tracking");
-        }
+        attempt.setAttempts(attempt.getAttempts() + 1);
+        attempt.setLastModified(new Date());
+        attemptRepo.save(attempt);
     }
 
     public void onLoginSuccess(String email) {
-        try {
-            redis.delete(key(email));
-        } catch (Exception e) {
-            System.out.println("Redis unavailable, skipping cleanup");
-        }
-    }
-
-    private String key(String email) {
-        return "login:fail:" + email.toLowerCase();
+        attemptRepo.deleteByEmail(email.toLowerCase());
     }
 }

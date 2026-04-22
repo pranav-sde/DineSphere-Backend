@@ -7,7 +7,7 @@ import com.festora.cartservice.dto.UpdateCartItemRequest;
 import com.festora.cartservice.model.AddonSnapshot;
 import com.festora.cartservice.model.Cart;
 import com.festora.cartservice.model.CartItem;
-import com.festora.cartservice.repository.CartRedisRepository;
+import com.festora.cartservice.repository.CartRepository;
 import com.festora.orderservice.dto.CreateOrderRequest;
 import com.festora.orderservice.model.Order;
 import com.festora.orderservice.model.OrderItem;
@@ -24,16 +24,9 @@ import java.util.*;
 @Slf4j
 public class CartService {
 
-    private final CartRedisRepository cartRepo;
+    private final CartRepository cartRepo;
     private final MenuLocalValidator menuValidator;
     private final OrderService orderService;
-
-    private String buildKey(CheckoutRequest request) {
-        if (ObjectUtils.isEmpty(request))
-            return null;
-
-        return "cart:" + request.getRestaurantId() + "_" + request.getTableNumber() + ":" + request.getUserId();
-    }
 
     public Cart addItem(AddToCartRequest req) {
 
@@ -41,25 +34,11 @@ public class CartService {
             throw new IllegalArgumentException("Quantity must be >= 1");
         }
 
-        CheckoutRequest checkoutRequest = CheckoutRequest.builder()
-                .restaurantId(req.getRestaurantId())
-                .userId(req.getSessionId())
-                .tableNumber(req.getTableNumber())
-                .build();
-
-        String key = buildKey(checkoutRequest);
-        Cart cart;
-        try {
-            cart = cartRepo.get(key);
-        } catch (Exception e) {
-            System.out.println(e.getMessage());
-            throw new RuntimeException(e);
-        }
-
-        if (cart == null) {
+        Cart cart = cartRepo.findByRestaurantIdAndTableNumberAndUserId(
+                req.getRestaurantId(), req.getTableNumber(), req.getSessionId()
+        ).orElseGet(() -> {
             long now = System.currentTimeMillis();
-
-            cart = Cart.builder()
+            return Cart.builder()
                     .cartId(UUID.randomUUID().toString())
                     .restaurantId(req.getRestaurantId())
                     .userId(req.getSessionId())
@@ -69,7 +48,7 @@ public class CartService {
                     .items(new ArrayList<>())
                     .subtotal(0)
                     .build();
-        }
+        });
 
         MenuValidationResult menuResult = menuValidator.validate(req.getRestaurantId(), req.getMenuItemId(),
                 req.getVariantId(), req.getAddonIds());
@@ -113,27 +92,16 @@ public class CartService {
         recalcSubtotal(cart);
         cart.setUpdatedAt(System.currentTimeMillis());
 
-        cartRepo.save(key, cart);
-        return cart;
+        return cartRepo.save(cart);
     }
 
     public Cart getCart(Long restaurantId, Integer tableNo, String userId) {
-
-        CheckoutRequest req = CheckoutRequest.builder()
-                .restaurantId(restaurantId)
-                .userId(userId)
-                .tableNumber(tableNo)
-                .build();
-
-        if (ObjectUtils.isEmpty(req))
-            return null;
-
-        Cart cart = cartRepo.get(buildKey(req));
-        return cart == null ? emptyCart(req) : cart;
+        return cartRepo.findByRestaurantIdAndTableNumberAndUserId(restaurantId, tableNo, userId)
+                .orElseGet(() -> emptyCart(restaurantId, tableNo, userId));
     }
 
     public void clearCart(CheckoutRequest req) {
-        cartRepo.delete(buildKey(req));
+        cartRepo.deleteByRestaurantIdAndTableNumberAndUserId(req.getRestaurantId(), req.getTableNumber(), req.getUserId());
     }
 
     private void recalcSubtotal(Cart cart) {
@@ -159,14 +127,14 @@ public class CartService {
                 + "|" + String.join(",", sorted);
     }
 
-    private Cart emptyCart(CheckoutRequest req) {
+    private Cart emptyCart(Long restaurantId, Integer tableNo, String userId) {
         long now = System.currentTimeMillis();
 
         return Cart.builder()
                 .cartId(UUID.randomUUID().toString())
-                .restaurantId(req.getRestaurantId())
-                .tableNumber(req.getTableNumber())
-                .userId(req.getUserId())
+                .restaurantId(restaurantId)
+                .tableNumber(tableNo)
+                .userId(userId)
                 .createdAt(now)
                 .updatedAt(now)
                 .items(new ArrayList<>())
@@ -179,18 +147,9 @@ public class CartService {
             throw new IllegalArgumentException("Quantity must be >= 1");
         }
 
-        CheckoutRequest request = CheckoutRequest.builder()
-                .restaurantId(req.getRestaurantId())
-                .userId(req.getUserId())
-                .tableNumber(req.getTableNumber())
-                .build();
-
-        String key = buildKey(request);
-        Cart cart = cartRepo.get(key);
-
-        if (cart == null) {
-            throw new NoSuchElementException("Cart not found");
-        }
+        Cart cart = cartRepo.findByRestaurantIdAndTableNumberAndUserId(
+                req.getRestaurantId(), req.getTableNumber(), req.getUserId()
+        ).orElseThrow(() -> new NoSuchElementException("Cart not found"));
 
         CartItem item =
                 cart.getItems().stream()
@@ -206,17 +165,13 @@ public class CartService {
         recalcSubtotal(cart);
         cart.setUpdatedAt(System.currentTimeMillis());
 
-        cartRepo.save(key, cart);
-        return cart;
+        return cartRepo.save(cart);
     }
 
     public Cart removeItem(CheckoutRequest req, String cartItemId) {
-        String key = buildKey(req);
-        Cart cart = cartRepo.get(key);
-
-        if (cart == null) {
-            throw new NoSuchElementException("Cart not found");
-        }
+        Cart cart = cartRepo.findByRestaurantIdAndTableNumberAndUserId(
+                req.getRestaurantId(), req.getTableNumber(), req.getUserId()
+        ).orElseThrow(() -> new NoSuchElementException("Cart not found"));
 
         boolean removed =
                 cart.getItems().removeIf(
@@ -230,30 +185,24 @@ public class CartService {
         recalcSubtotal(cart);
         cart.setUpdatedAt(System.currentTimeMillis());
 
-        // Optional: if cart empty, you may delete key
         if (cart.getItems().isEmpty()) {
-            cartRepo.delete(key);
-            return emptyCart(req);
+            cartRepo.delete(cart);
+            return emptyCart(req.getRestaurantId(), req.getTableNumber(), req.getUserId());
         }
 
-        cartRepo.save(key, cart);
-        return cart;
+        return cartRepo.save(cart);
     }
 
     public Object checkout(CheckoutRequest req) {
-        String key = buildKey(req);
-        Cart cart;
-        try {
-            cart = cartRepo.get(key);
-        } catch (Exception e) {
-            log.error("Failed to retrieve cart: {}", e.getMessage());
-            throw new NoSuchElementException("Cart not found");
-        }
-        if (cart == null || cart.getItems().isEmpty()) {
-            throw new IllegalStateException("Cart expired or empty");
+        Cart cart = cartRepo.findByRestaurantIdAndTableNumberAndUserId(
+                req.getRestaurantId(), req.getTableNumber(), req.getUserId()
+        ).orElseThrow(() -> new NoSuchElementException("Cart not found"));
+
+        if (cart.getItems().isEmpty()) {
+            throw new IllegalStateException("Cart empty");
         }
 
-        // Step 1: Final menu re-validation (no price recalculation)
+        // Step 1: Final menu re-validation
         cart.getItems().forEach(item ->
                 menuValidator.validate(
                         req.getRestaurantId(),
@@ -266,7 +215,7 @@ public class CartService {
                 )
         );
 
-        // Step 2: Build CreateOrderRequest for OrderService
+        // Step 2: Build CreateOrderRequest
         String generatedOrderId = UUID.randomUUID().toString();
         CreateOrderRequest orderRequest = new CreateOrderRequest();
         orderRequest.setOrderId(generatedOrderId);
@@ -297,23 +246,16 @@ public class CartService {
                         .toList()
         );
 
-        // Step 3: Directly call OrderService — saves order as CREATED, checks inventory,
-        //         then transitions to PENDING (or REJECTED on out-of-stock)
         Order order;
         try {
             order = orderService.createOrder(orderRequest);
-        } catch (IllegalStateException e) {
-            // Inventory check failed — OUT_OF_STOCK
-            log.warn("Checkout failed: inventory issue for cart key={}: {}", key, e.getMessage());
-            throw e;
         } catch (Exception e) {
-            log.error("Checkout failed unexpectedly: {}", e.getMessage(), e);
-            throw new RuntimeException("Order creation failed: " + e.getMessage(), e);
+            log.error("Checkout failed: {}", e.getMessage());
+            throw new RuntimeException("Order creation failed: " + e.getMessage());
         }
 
-        // Step 4: Clear cart only after successful order creation
-        cartRepo.delete(key);
-        log.info("Checkout successful. orderId={} status={}", order.getOrderId(), order.getStatus());
+        // Step 4: Clear cart
+        cartRepo.delete(cart);
 
         // Step 5: Build response
         Map<String, Object> response = new HashMap<>();

@@ -86,4 +86,17 @@ public class MultiMongoConfig {
             return new MongoTemplate(new SimpleMongoClientDatabaseFactory(mongoClient, "auth_db"));
         }
     }
+
+    // --- Cart Service Config ---
+    @Configuration
+    @EnableMongoRepositories(
+            basePackages = "com.festora.cartservice.repository",
+            mongoTemplateRef = "cartMongoTemplate"
+    )
+    public static class CartMongoConfig {
+        @Bean
+        public MongoTemplate cartMongoTemplate(MongoClient mongoClient) {
+            return new MongoTemplate(new SimpleMongoClientDatabaseFactory(mongoClient, "cart_db"));
+        }
+    }
 }

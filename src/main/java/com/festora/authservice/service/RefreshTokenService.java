@@ -1,42 +1,49 @@
 package com.festora.authservice.service;
 
-import org.springframework.data.redis.core.StringRedisTemplate;
+import com.festora.authservice.model.RefreshToken;
+import com.festora.authservice.repository.RefreshTokenRepository;
 import org.springframework.stereotype.Service;
 
-import java.time.Duration;
+import java.time.Instant;
+import java.util.Date;
 import java.util.UUID;
 
 @Service
 public class RefreshTokenService {
 
-    private final StringRedisTemplate redis;
-    private static final Duration TTL = Duration.ofDays(7);
+    private final RefreshTokenRepository refreshTokenRepository;
+    private static final long TTL_MILLIS = 7L * 24 * 60 * 60 * 1000; // 7 days
 
-    public RefreshTokenService(StringRedisTemplate redis) {
-        this.redis = redis;
+    public RefreshTokenService(RefreshTokenRepository refreshTokenRepository) {
+        this.refreshTokenRepository = refreshTokenRepository;
     }
 
     public String create(String userId) {
         String tokenId = UUID.randomUUID().toString();
-        redis.opsForValue().set(key(tokenId), userId, TTL);
+        RefreshToken refreshToken = RefreshToken.builder()
+                .token(tokenId)
+                .userId(userId)
+                .expiryDate(new Date(System.currentTimeMillis() + TTL_MILLIS))
+                .build();
+        refreshTokenRepository.save(refreshToken);
         return tokenId;
     }
 
     public String validateAndConsume(String tokenId) {
-        String key = key(tokenId);
-        String userId = redis.opsForValue().get(key);
-        if (userId == null) {
-            throw new RuntimeException("Invalid refresh token");
+        RefreshToken refreshToken = refreshTokenRepository.findByToken(tokenId)
+                .orElseThrow(() -> new RuntimeException("Invalid refresh token"));
+
+        if (refreshToken.getExpiryDate().before(new Date())) {
+            refreshTokenRepository.deleteByToken(tokenId);
+            throw new RuntimeException("Refresh token expired");
         }
-        redis.delete(key); // one-time use
+
+        String userId = refreshToken.getUserId();
+        refreshTokenRepository.deleteByToken(tokenId); // one-time use
         return userId;
     }
 
     public void revokeAllForUser(String userId) {
-        // optional optimization later (index by user)
-    }
-
-    private String key(String tokenId) {
-        return "refresh:" + tokenId;
+        refreshTokenRepository.deleteByUserId(userId);
     }
 }
