@@ -61,7 +61,7 @@ public class InventoryController {
         return ResponseEntity.ok().build();
     }
 
-    @PatchMapping("/toggle")
+    @PostMapping("/toggle")
     public ResponseEntity<Void> toggle(
             @RequestBody ToggleInventoryRequest req
     ) {
