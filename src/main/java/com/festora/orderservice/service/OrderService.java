@@ -462,6 +462,8 @@ public class OrderService {
                 List.of(
                         OrderStatus.PENDING,
                         OrderStatus.CREATED,
+                        OrderStatus.CANCELLED,
+                        OrderStatus.PAID,
                         OrderStatus.PREPARING,
                         OrderStatus.PAYMENT_PENDING
                 )

@@ -38,7 +38,6 @@ public class SecurityConfig {
                             "https://qr-admin-prananvs-projects.vercel.app",
                             "http://localhost:5173",
                             "https://qrfooiesadmin.vercel.app",
-                            "https://scan-eat-admin.onrender.com",
                             "https://food-qr-micro-services-3.onrender.com"
                     ));
                     config.setAllowedMethods(java.util.List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
