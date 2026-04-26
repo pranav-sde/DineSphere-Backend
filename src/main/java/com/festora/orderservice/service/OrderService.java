@@ -15,6 +15,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
+import org.springframework.util.CollectionUtils;
 import org.springframework.util.ObjectUtils;
 
 import java.time.LocalDate;
@@ -458,7 +459,7 @@ public class OrderService {
 
     public List<Order> getActiveOwnerOrders(Long restaurantId) {
         log.info("Fetching active orders from DB for restaurant {}", restaurantId);
-        return orderRepository.findByRestaurantIdAndStatusIn(restaurantId,
+        List<Order> allOrders = orderRepository.findByRestaurantIdAndStatusIn(restaurantId,
                 List.of(
                         OrderStatus.PENDING,
                         OrderStatus.CREATED,
@@ -468,6 +469,10 @@ public class OrderService {
                         OrderStatus.PAYMENT_PENDING
                 )
         );
+
+        if (CollectionUtils.isEmpty(allOrders))
+            return Collections.emptyList();
+        return allOrders.reversed();
     }
 
     private String itemKey(OrderItem item) {

@@ -53,7 +53,7 @@ public class InventoryController {
         return ResponseEntity.ok(inventoryService.getInventory(restaurantId));
     }
 
-    @PatchMapping("/stock")
+    @PostMapping("/stock")
     public ResponseEntity<Void> updateStock(
             @RequestBody UpdateStockRequest req
     ) {
