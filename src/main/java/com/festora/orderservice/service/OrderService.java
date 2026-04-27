@@ -38,14 +38,15 @@ public class OrderService {
         }
 
         Order order = buildOrder(req);
-        // Let MongoDB generate the orderId
-        order = orderRepository.save(order);
         
         try {
             inventoryClient.tempReserve(order);
             order.setStatus(OrderStatus.PENDING);
         } catch (Exception e) {
             order.setStatus(OrderStatus.REJECTED);
+            log.error("Inventory reservation failed for order {}: {}", order.getOrderId(), e.getMessage());
+            // No need to throw IllegalStateException if we handle it gracefully here, 
+            // but keeping current behavior (throwing exception) for frontend compatibility.
             order.setUpdatedAt(now());
             orderRepository.save(order);
             throw new IllegalStateException("OUT_OF_STOCK");
@@ -196,6 +197,16 @@ public class OrderService {
         return System.currentTimeMillis();
     }
 
+    private String generateOrderId() {
+        String alphanumeric = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+        StringBuilder sb = new StringBuilder("ORD_");
+        Random random = new Random();
+        for (int i = 0; i < 8; i++) {
+            sb.append(alphanumeric.charAt(random.nextInt(alphanumeric.length())));
+        }
+        return sb.toString();
+    }
+
     private Order buildOrder(CreateOrderRequest req) {
 
         List<OrderItem> resolvedItems = req.getItems().stream()
@@ -209,7 +220,7 @@ public class OrderService {
         GstResult gst = gstCalculator.calculate(req.getRestaurantId(), base);
 
         return Order.builder()
-                .orderId(req.getOrderId())
+                .orderId(generateOrderId())
                 .restaurantId(req.getRestaurantId())
                 .userId(req.getUserId())
                 .deviceId(req.getDeviceId())
@@ -458,7 +469,7 @@ public class OrderService {
 
     public List<Order> getActiveOwnerOrders(Long restaurantId) {
         log.info("Fetching active orders from DB for restaurant {}", restaurantId);
-        List<Order> allOrders = orderRepository.findByRestaurantIdAndStatusIn(restaurantId,
+        return orderRepository.findByRestaurantIdAndStatusInOrderByCreatedAtDesc(restaurantId,
                 List.of(
                         OrderStatus.PENDING,
                         OrderStatus.CREATED,
@@ -468,12 +479,6 @@ public class OrderService {
                         OrderStatus.PAYMENT_PENDING
                 )
         );
-
-        if (CollectionUtils.isEmpty(allOrders))
-            return Collections.emptyList();
-
-        Collections.reverse(allOrders);
-        return allOrders;
     }
 
     private String itemKey(OrderItem item) {

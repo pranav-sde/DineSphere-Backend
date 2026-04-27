@@ -81,7 +81,7 @@ public class MenuItemService {
                 .build();
     }
 
-    @CacheEvict(value = "menuCache", allEntries = true)
+    @CacheEvict(value = {"menuCache", "menuPriceCache"}, allEntries = true)
     public MenuItemDto createMenuItem(
             MenuItemDto dto,
             Long restaurantId,
@@ -102,7 +102,7 @@ public class MenuItemService {
     /**
      * UPDATE menu item
      */
-    @CacheEvict(value = "menuCache", allEntries = true)
+    @CacheEvict(value = {"menuCache", "menuPriceCache"}, allEntries = true)
     public MenuItemDto updateMenuItem(
             String menuItemId,
             MenuItemDto dto
@@ -122,7 +122,7 @@ public class MenuItemService {
     /**
      * ENABLE / DISABLE menu item (soft delete)
      */
-    @CacheEvict(value = "menuCache", allEntries = true)
+    @CacheEvict(value = {"menuCache", "menuPriceCache"}, allEntries = true)
     public void toggleMenuItem(String menuItemId, boolean enabled) {
         MenuItem item = itemRepo.findById(menuItemId)
                 .orElseThrow(() ->
@@ -134,6 +134,7 @@ public class MenuItemService {
         MenuItem saved = itemRepo.save(item);
     }
 
+    @Cacheable(value = "menuPriceCache", key = "#request.menuItemId + ':' + #request.variantId + ':' + (#request.addonIds != null ? #request.addonIds.toString() : 'none')")
     public MenuItemPriceResponse calculateFinalPrice(MenuPriceRequest request) {
 
         MenuItem menuItem = itemRepo.findById(request.getMenuItemId())

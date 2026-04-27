@@ -4,6 +4,7 @@ import com.festora.orderservice.dto.GstResult;
 import com.festora.orderservice.model.RestaurantTaxConfig;
 import com.festora.orderservice.repository.RestaurantTaxConfigRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -12,6 +13,7 @@ public class GstCalculator {
 
     private final RestaurantTaxConfigRepository taxRepo;
 
+    @Cacheable(value = "taxConfigCache", key = "#restaurantId")
     public GstResult calculate(Long restaurantId, double subtotal) {
 
         RestaurantTaxConfig config = taxRepo

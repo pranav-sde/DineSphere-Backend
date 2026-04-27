@@ -63,7 +63,7 @@ public class MenuOverviewService {
             Long restaurantId,
             String categoryId
     ) {
-       List<MenuItem> menuItems = itemRepo.findByRestaurantIdAndCategoryId(restaurantId, categoryId);
+       List<MenuItem> menuItems = itemRepo.findByRestaurantIdAndCategoryIdAndEnabled(restaurantId, categoryId, true);
        if (CollectionUtils.isEmpty(menuItems)) {
            return new ArrayList<>();
        }
