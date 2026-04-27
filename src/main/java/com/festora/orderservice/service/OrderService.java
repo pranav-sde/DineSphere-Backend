@@ -3,7 +3,6 @@ package com.festora.orderservice.service;
 import com.festora.orderservice.client.InventoryClient;
 import com.festora.orderservice.client.MenuClient;
 import com.festora.orderservice.dto.*;
-import com.festora.monolith.dto.MenuItemRedis;
 import com.festora.orderservice.dto.event.InventoryConsumerEvent;
 import com.festora.orderservice.dto.event.OrderCancelledProducerEvent;
 import com.festora.orderservice.enums.OrderStatus;
@@ -472,7 +471,9 @@ public class OrderService {
 
         if (CollectionUtils.isEmpty(allOrders))
             return Collections.emptyList();
-        return allOrders.reversed();
+
+        Collections.reverse(allOrders);
+        return allOrders;
     }
 
     private String itemKey(OrderItem item) {

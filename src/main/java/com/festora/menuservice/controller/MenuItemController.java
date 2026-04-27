@@ -101,7 +101,7 @@ public class MenuItemController {
     ) {
         Long rid = restaurantIdHeader != null ? restaurantIdHeader : restaurantId;
         try {
-            MenuItemPageResponse response = menuItemService.getMenuItemsResponse(rid, null);
+            MenuItemPageResponse response = menuItemService.getMenuItemsForCustomers(rid);
             return ResponseEntity.ok(response);
         } catch (Exception e) {
             System.out.println(e.getMessage());

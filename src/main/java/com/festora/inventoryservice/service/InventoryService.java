@@ -218,7 +218,7 @@ public class InventoryService {
             throw new IllegalStateException("Cannot reduce stock below confirmed quantity");
         }
 
-        item.setTotalStock(req.getNewTotalStock());
+        item.setTotalStock(req.getNewTotalStock() + item.getTotalStock());
         item.setUpdatedAt(System.currentTimeMillis());
         inventoryItemRepo.save(item);
     }

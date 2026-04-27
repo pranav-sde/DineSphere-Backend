@@ -68,7 +68,7 @@ public class MenuItemService {
             String categoryId
     ) {
         if (ObjectUtils.isEmpty(restaurantId)) {
-            throw new IllegalArgumentException("categoryId and restaurantId cannot be empty");
+            throw new IllegalArgumentException("RestaurantId cannot be empty");
         }
 
         List<MenuItemDto> items = StringUtils.isBlank(categoryId)
@@ -188,6 +188,23 @@ public class MenuItemService {
                 .name(menuItem.getName())
                 .variantName(variantName)
                 .addonNames(addonNames)
+                .build();
+    }
+
+    @Cacheable(value = "menuCache", key = "'customerMenu:' + #restaurantId")
+    public MenuItemPageResponse getMenuItemsForCustomers(Long restaurantId) {
+        if (restaurantId == null || restaurantId == 0)
+            throw new IllegalArgumentException("Restaurant Id is Empty");
+
+        List<MenuItemDto> items = itemRepo.findByRestaurantId(restaurantId)
+                .stream()
+                .filter(MenuItem::getEnabled)
+                .map(menuMapper::toMenuItemDto)
+                .toList();
+
+        return MenuItemPageResponse.builder()
+                .items(items)
+                .totalElements(ObjectUtils.isEmpty(items) ? 0 : items.size())
                 .build();
     }
 }
