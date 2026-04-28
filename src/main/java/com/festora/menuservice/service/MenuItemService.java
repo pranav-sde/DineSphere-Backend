@@ -192,16 +192,24 @@ public class MenuItemService {
                 .build();
     }
 
-    @Cacheable(value = "menuCache", key = "'customerMenu:' + #restaurantId")
-    public MenuItemPageResponse getMenuItemsForCustomers(Long restaurantId) {
+    @Cacheable(value = "menuCache", key = "'customerMenu:' + #restaurantId + ':' + #categoryId")
+    public MenuItemPageResponse getMenuItemsForCustomers(Long restaurantId, String categoryId) {
         if (restaurantId == null || restaurantId == 0)
             throw new IllegalArgumentException("Restaurant Id is Empty");
 
-        List<MenuItemDto> items = itemRepo.findByRestaurantId(restaurantId)
-                .stream()
-                .filter(MenuItem::getEnabled)
-                .map(menuMapper::toMenuItemDto)
-                .toList();
+        List<MenuItemDto> items;
+        if (StringUtils.isBlank(categoryId)) {
+            items = itemRepo.findByRestaurantId(restaurantId)
+                    .stream()
+                    .filter(item -> Boolean.TRUE.equals(item.getEnabled()))
+                    .map(menuMapper::toMenuItemDto)
+                    .toList();
+        } else {
+            items = itemRepo.findByRestaurantIdAndCategoryIdAndEnabled(restaurantId, categoryId, true)
+                    .stream()
+                    .map(menuMapper::toMenuItemDto)
+                    .toList();
+        }
 
         return MenuItemPageResponse.builder()
                 .items(items)
@@ -209,3 +217,5 @@ public class MenuItemService {
                 .build();
     }
 }
+
+

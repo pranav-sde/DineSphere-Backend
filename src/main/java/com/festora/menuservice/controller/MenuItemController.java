@@ -22,22 +22,16 @@ public class MenuItemController {
         return new ResponseEntity<>("Menu Service up", HttpStatus.OK);
     }
 
-    // ── Public: customers access without JWT, restaurantId comes from query param or header
-    @GetMapping("/items-by-category")
+    @GetMapping("/customer/items-by-category")
     public ResponseEntity<MenuItemPageResponse> getItemsByCategory(
             @RequestHeader(value = "X-Restaurant-Id", required = false) Long restaurantIdHeader,
             @RequestParam(required = false) Long restaurantId,
             @RequestParam String categoryId
     ) {
-        Long rid = restaurantIdHeader != null ? restaurantIdHeader : restaurantId;
-        try {
-            MenuItemPageResponse response = menuItemService.getMenuItemsResponse(rid, categoryId);
-            return new ResponseEntity<>(response, HttpStatus.OK);
-        } catch (Exception e) {
-            System.out.println(e.getMessage());
-            return ResponseEntity.badRequest().build();
-        }
+        return getItems(restaurantIdHeader, restaurantId, categoryId);
     }
+
+
 
     @PostMapping("/internal/menu/price")
     public ResponseEntity<MenuItemPriceResponse> calculatePrice(
@@ -50,18 +44,20 @@ public class MenuItemController {
 
     @GetMapping("/owner/items")
     public ResponseEntity<MenuItemPageResponse> getItemsByRestaurantId(
-            @RequestHeader("X-Restaurant-Id") Long restaurantId
+            @RequestHeader("X-Restaurant-Id") Long restaurantId,
+            @RequestParam(required = false) String categoryId
     ) {
         if (restaurantId == null || restaurantId == 0)
             restaurantId = 101L;
         try {
-            MenuItemPageResponse response = menuItemService.getMenuItemsResponse(restaurantId, null);
+            MenuItemPageResponse response = menuItemService.getMenuItemsResponse(restaurantId, categoryId);
             return new ResponseEntity<>(response, HttpStatus.OK);
         } catch (Exception e) {
             System.out.println(e.getMessage());
             return ResponseEntity.badRequest().build();
         }
     }
+
 
     @PostMapping("/items")
     public ResponseEntity<MenuItemDto> create(
@@ -93,20 +89,22 @@ public class MenuItemController {
         return ResponseEntity.ok().build();
     }
 
-    // ── Public: customers browse the full menu
+    // ── Public: customers browse the full menu or filtered by category
     @GetMapping("/items")
     public ResponseEntity<MenuItemPageResponse> getItems(
             @RequestHeader(value = "X-Restaurant-Id", required = false) Long restaurantIdHeader,
-            @RequestParam(required = false) Long restaurantId
+            @RequestParam(required = false) Long restaurantId,
+            @RequestParam(required = false) String categoryId
     ) {
         Long rid = restaurantIdHeader != null ? restaurantIdHeader : restaurantId;
         try {
-            MenuItemPageResponse response = menuItemService.getMenuItemsForCustomers(rid);
+            MenuItemPageResponse response = menuItemService.getMenuItemsForCustomers(rid, categoryId);
             return ResponseEntity.ok(response);
         } catch (Exception e) {
             System.out.println(e.getMessage());
         }
         return new ResponseEntity<>(HttpStatus.BAD_REQUEST);
     }
+
 }
 

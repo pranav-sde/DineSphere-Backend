@@ -46,7 +46,7 @@ public class MonolithRedisConfig {
     @Primary
     public org.springframework.cache.CacheManager cacheManager() {
         return new org.springframework.cache.concurrent.ConcurrentMapCacheManager(
-                "menuCache", "ownerInventory"
+                "menuCache", "ownerInventory", "menuPriceCache", "taxConfigCache"
         );
     }
 }
