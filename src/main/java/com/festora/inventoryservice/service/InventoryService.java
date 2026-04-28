@@ -284,26 +284,12 @@ public class InventoryService {
             throw new IllegalArgumentException("At least one item is required");
         }
 
-        // Prevent duplicate items in same order
-        var seen = new java.util.HashSet<String>();
-
         for (ReservedItemRequest item : request.getItems()) {
-
             if (item.getMenuItemId() == null || item.getMenuItemId().isBlank()) {
                 throw new IllegalArgumentException("menuItemId is required");
             }
-
             if (item.getQuantity() <= 0) {
                 throw new IllegalArgumentException("Quantity must be greater than zero");
-            }
-
-            String key = item.getMenuItemId() + "|" +
-                    (item.getVariantId() == null ? "NA" : item.getVariantId());
-
-            if (!seen.add(key)) {
-                throw new IllegalArgumentException(
-                        "Duplicate menu item in request: " + key
-                );
             }
         }
     }

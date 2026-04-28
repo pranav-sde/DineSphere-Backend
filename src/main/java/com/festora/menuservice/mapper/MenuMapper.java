@@ -53,7 +53,9 @@ public class MenuMapper {
                 .name(entity.getName())
                 .description(entity.getDescription())
                 .imageUrl(entity.getImageUrl())
+                .categoryId(entity.getCategoryId())
                 .veg(entity.getVeg())
+
                 .enabled(entity.getEnabled())
                 .basePrice(entity.getBasePrice())
                 .variants(toVariantDtos(entity.getVariants()))

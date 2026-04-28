@@ -17,8 +17,10 @@ public class MenuItemDto {
     private String name;
     private String description;
     private String imageUrl;
+    private String categoryId;
 
     private Boolean veg;
+
     private Boolean enabled;
 
     private Double basePrice;

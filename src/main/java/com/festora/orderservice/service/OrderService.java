@@ -45,11 +45,9 @@ public class OrderService {
         } catch (Exception e) {
             order.setStatus(OrderStatus.REJECTED);
             log.error("Inventory reservation failed for order {}: {}", order.getOrderId(), e.getMessage());
-            // No need to throw IllegalStateException if we handle it gracefully here, 
-            // but keeping current behavior (throwing exception) for frontend compatibility.
             order.setUpdatedAt(now());
             orderRepository.save(order);
-            throw new IllegalStateException("OUT_OF_STOCK");
+            throw new IllegalStateException(e.getMessage());
         }
         order.setUpdatedAt(now());
         return orderRepository.save(order);
@@ -247,7 +245,7 @@ public class OrderService {
                 );
 
         if (price == null || price.getFinalPrice() <= 0) {
-            throw new IllegalStateException("Invalid menu price for item : " + item.getMenuItemId());
+            throw new IllegalStateException("INVALID_MENU_PRICE");
         }
 
         item.setName(price.getName());
@@ -342,7 +340,7 @@ public class OrderService {
         Order order = get(orderId);
 
         if (order.getStatus() != OrderStatus.CREATED && order.getStatus() != OrderStatus.PENDING) {
-            throw new IllegalStateException("Order not editable");
+            throw new IllegalStateException("ORDER_NOT_EDITABLE");
         }
 
         if (request == null || request.getItems() == null) {
@@ -406,7 +404,7 @@ public class OrderService {
         }
 
         if (result.isEmpty()) {
-            throw new IllegalStateException("Order must contain at least one item");
+            throw new IllegalStateException("EMPTY_ORDER");
         }
 
         return result;
