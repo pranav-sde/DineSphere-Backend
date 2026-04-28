@@ -62,7 +62,7 @@ public class CustomerSessionService {
                 sessionRepo.save(session);
 
                 long remainingSeconds = (session.getExpiryDate().getTime() - System.currentTimeMillis()) / 1000;
-                return new SessionStartResponse(
+                return new SessionStartResponse( tableNumber,
                         createToken(session.getSessionId(), restaurantId, tableNumber, deviceId),
                         remainingSeconds
                 );
@@ -82,7 +82,7 @@ public class CustomerSessionService {
                 .build();
         sessionRepo.save(session);
 
-        return new SessionStartResponse(
+        return new SessionStartResponse(tableNumber,
                 createToken(sessionId, restaurantId, tableNumber, deviceId),
                 SESSION_TTL_MILLIS / 1000
         );
