@@ -3,6 +3,7 @@ package com.festora.menuservice.service;
 import com.festora.menuservice.dto.CategoryDto;
 import com.festora.menuservice.entity.Category;
 import com.festora.menuservice.repository.CategoryRepository;
+import io.micrometer.common.util.StringUtils;
 import lombok.RequiredArgsConstructor;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
@@ -65,5 +66,12 @@ public class CategoryService {
                 .name(c.getName())
                 .description(c.getDescription())
                 .build();
+    }
+
+    public void removeCategory(String categoryId) throws Exception {
+        if(StringUtils.isBlank(categoryId))
+            throw new Exception("CategoryId is Empty");
+
+        categoryRepo.deleteById(categoryId);
     }
 }

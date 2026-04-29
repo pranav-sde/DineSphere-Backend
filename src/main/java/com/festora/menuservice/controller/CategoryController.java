@@ -26,4 +26,13 @@ public class CategoryController {
     ) {
         return categoryService.createCategory(restaurantId, dto);
     }
+
+    @DeleteMapping()
+    public void deleteCategory(@RequestParam("categoryId") String categoryId) {
+        try {
+            categoryService.removeCategory(categoryId);
+        } catch (Exception e) {
+            System.out.println(e.getMessage());
+        }
+    }
 }
