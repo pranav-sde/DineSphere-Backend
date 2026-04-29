@@ -1,6 +1,7 @@
 package com.festora.inventoryservice.controller;
 
 import com.festora.inventoryservice.dto.*;
+import com.festora.inventoryservice.dto.BulkUpdateStockRequest;
 import com.festora.inventoryservice.dto.event.InventoryReservationEvent;
 import com.festora.inventoryservice.exception.OutOfStockException;
 import com.festora.inventoryservice.service.InventoryService;

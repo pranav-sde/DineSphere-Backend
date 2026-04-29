@@ -1,6 +1,8 @@
 package com.festora.inventoryservice.service;
 
 import com.festora.inventoryservice.dto.*;
+import com.festora.inventoryservice.dto.BulkUpdateStockRequest;
+import com.festora.inventoryservice.dto.BulkUpsertStockItem;
 import com.festora.inventoryservice.dto.event.InventoryReservationEvent;
 import com.festora.inventoryservice.entity.*;
 import com.festora.inventoryservice.enums.ReservationStatus;
