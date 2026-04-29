@@ -18,6 +18,7 @@ import org.springframework.util.ObjectUtils;
 import java.util.List;
 import java.util.Map;
 import java.util.HashMap;
+import java.util.ArrayList;
 
 @Service
 @RequiredArgsConstructor
@@ -221,6 +222,115 @@ public class InventoryService {
         item.setTotalStock(req.getNewTotalStock() + item.getTotalStock());
         item.setUpdatedAt(System.currentTimeMillis());
         inventoryItemRepo.save(item);
+    }
+
+    @Transactional
+    @CacheEvict(value = "ownerInventory", allEntries = true)
+    public void bulkUpsertStock(BulkUpdateStockRequest req, Long restaurantId) {
+        if (req.getItems() == null || req.getItems().isEmpty()) {
+            throw new IllegalArgumentException("Items list cannot be empty");
+        }
+
+        long now = System.currentTimeMillis();
+
+        // 1. Fetch all existing inventory items for this restaurant to avoid N queries in loop
+        List<InventoryItem> allExistingItems = inventoryItemRepo.findAllByRestaurantId(restaurantId);
+        
+        // Map for quick lookup: menuItemId + ":" + (variantId != null ? variantId : "") -> InventoryItem
+        Map<String, InventoryItem> existingItemsMap = new HashMap<>();
+        for (InventoryItem item : allExistingItems) {
+            String key = item.getMenuItemId() + ":" + (item.getVariantId() != null ? item.getVariantId() : "");
+            existingItemsMap.put(key, item);
+        }
+
+        // Also map by ID for those that provide inventoryItemId
+        Map<String, InventoryItem> itemsByIdMap = new HashMap<>();
+        for (InventoryItem item : allExistingItems) {
+            itemsByIdMap.put(item.getId(), item);
+        }
+
+        // 2. Fetch all stocks for these items
+        List<String> allItemIds = allExistingItems.stream().map(InventoryItem::getId).toList();
+        Map<String, InventoryStock> stockMap = new HashMap<>();
+        stockRepo.findAllById(allItemIds).forEach(s -> stockMap.put(s.getInventoryItemId(), s));
+
+        List<InventoryItem> itemsToSave = new ArrayList<>();
+        int updateCount = 0;
+        int insertCount = 0;
+
+        for (BulkUpsertStockItem upsertReq : req.getItems()) {
+            InventoryItem item = null;
+
+            // Try to find by ID first
+            if (upsertReq.getInventoryItemId() != null && !upsertReq.getInventoryItemId().isBlank()) {
+                item = itemsByIdMap.get(upsertReq.getInventoryItemId());
+            } 
+            
+            // If not found by ID (or ID not provided), try finding by menu item + variant
+            if (item == null && upsertReq.getMenuItemId() != null && !upsertReq.getMenuItemId().isBlank()) {
+                String variantId = upsertReq.getVariantId();
+                if (variantId != null && variantId.isBlank()) variantId = null;
+                String key = upsertReq.getMenuItemId() + ":" + (variantId != null ? variantId : "");
+                item = existingItemsMap.get(key);
+            }
+
+            if (item != null) {
+                // UPDATE existing
+                InventoryStock stock = stockMap.get(item.getId());
+                // In case stock is missing for some reason, we'll create it later but assume 0 for check
+                int confirmedQty = (stock != null) ? stock.getConfirmedQty() : 0;
+
+                if (upsertReq.getTotalStock() < confirmedQty) {
+                    throw new IllegalStateException("Cannot reduce stock below confirmed quantity for item: " + item.getId());
+                }
+
+                item.setTotalStock(upsertReq.getTotalStock() + item.getTotalStock());
+                item.setUpdatedAt(now);
+                itemsToSave.add(item);
+                updateCount++;
+            } else {
+                // INSERT new
+                if (upsertReq.getMenuItemId() == null || upsertReq.getMenuItemId().isBlank()) {
+                    throw new IllegalArgumentException("menuItemId is required for new inventory items");
+                }
+
+                InventoryItem newItem = new InventoryItem();
+                newItem.setRestaurantId(restaurantId);
+                newItem.setMenuItemId(upsertReq.getMenuItemId());
+                String vId = upsertReq.getVariantId();
+                if (vId != null && vId.isBlank()) vId = null;
+                newItem.setVariantId(vId);
+                newItem.setTotalStock(upsertReq.getTotalStock());
+                newItem.setEnabled(upsertReq.isEnabled());
+                newItem.setUpdatedAt(now);
+                itemsToSave.add(newItem);
+                insertCount++;
+            }
+        }
+
+        // 3. Batch write all items
+        List<InventoryItem> savedItems = inventoryItemRepo.saveAll(itemsToSave);
+
+        // 4. Batch write all missing stocks
+        List<InventoryStock> stocksToSave = new ArrayList<>();
+        for (InventoryItem saved : savedItems) {
+            if (!stockMap.containsKey(saved.getId())) {
+                InventoryStock stock = new InventoryStock();
+                stock.setInventoryItemId(saved.getId());
+                stock.setReservedQty(0);
+                stock.setConfirmedQty(0);
+                stock.setUpdatedAt(now);
+                stocksToSave.add(stock);
+                // Update map so we don't try to add it again if the list had duplicates (though it shouldn't)
+                stockMap.put(saved.getId(), stock);
+            }
+        }
+
+        if (!stocksToSave.isEmpty()) {
+            stockRepo.saveAll(stocksToSave);
+        }
+
+        log.info("Bulk upsert finished: {} total saved ({} updates, {} inserts)", savedItems.size(), updateCount, insertCount);
     }
 
     @CacheEvict(value = "ownerInventory", allEntries = true)

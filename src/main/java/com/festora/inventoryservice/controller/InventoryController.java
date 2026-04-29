@@ -61,6 +61,23 @@ public class InventoryController {
         return ResponseEntity.ok().build();
     }
 
+    @PostMapping("/stock/bulk")
+    public ResponseEntity<Void> bulkUpsertStock(
+            @RequestBody BulkUpdateStockRequest req,
+            @RequestHeader("X-Restaurant-Id") Long restaurantId
+    ) {
+        try {
+            inventoryService.bulkUpsertStock(req, restaurantId);
+            return ResponseEntity.ok().build();
+        } catch (IllegalArgumentException e) {
+            log.warn("Bulk stock upsert failed: {}", e.getMessage());
+            return ResponseEntity.badRequest().build();
+        } catch (Exception e) {
+            log.error("Bulk stock upsert error", e);
+            return ResponseEntity.internalServerError().build();
+        }
+    }
+
     @PostMapping("/toggle")
     public ResponseEntity<Void> toggle(
             @RequestBody ToggleInventoryRequest req
