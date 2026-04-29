@@ -68,6 +68,7 @@ public class CategoryService {
                 .build();
     }
 
+    @CacheEvict(value = "menuCache", allEntries = true)
     public void removeCategory(String categoryId) throws Exception {
         if(StringUtils.isBlank(categoryId))
             throw new Exception("CategoryId is Empty");
