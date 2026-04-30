@@ -9,6 +9,7 @@ import com.festora.inventoryservice.enums.ReservationStatus;
 import com.festora.inventoryservice.exception.OutOfStockException;
 import com.festora.inventoryservice.repo.*;
 import io.micrometer.common.util.StringUtils;
+import org.springframework.cache.CacheManager;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.transaction.annotation.Transactional;
@@ -32,6 +33,7 @@ public class InventoryService {
     private final InventoryReservationRepository reservationRepo;
     private final InventoryReservationItemRepository reservationItemRepo;
     private final InventoryItemRepository inventoryItemRepo;
+    private final CacheManager cacheManager;
 
     /* =========================================================
        ORDER → INVENTORY FLOW
@@ -59,6 +61,7 @@ public class InventoryService {
 
         InventoryReservation reservation = new InventoryReservation();
         reservation.setOrderId(orderId);
+        reservation.setRestaurantId(request.getRestaurantId());
         reservation.setStatus(ReservationStatus.TEMP_RESERVED);
         reservation.setCreatedAt(now);
         reservation.setExpiresAt(expiresAt);
@@ -71,13 +74,12 @@ public class InventoryService {
 
         for (ReservedItemRequest reqItem : request.getItems()) {
             String variantId = reqItem.getVariantId();
-            if (variantId != null && variantId.isBlank()) {
-                variantId = null;
-            }
 
-            InventoryItem item = StringUtils.isBlank(variantId)
-                    ? inventoryItemRepo.findAllByRestaurantIdAndMenuItemId(request.getRestaurantId(), reqItem.getMenuItemId()).stream().findFirst().orElse(null)
-                    : inventoryItemRepo.findByRestaurantIdAndMenuItemIdAndVariantId(request.getRestaurantId(), reqItem.getMenuItemId(), variantId).orElse(null);
+            InventoryItem item = inventoryItemRepo.findByRestaurantIdAndMenuItemIdAndVariantId(
+                    request.getRestaurantId(),
+                    reqItem.getMenuItemId(),
+                    StringUtils.isBlank(variantId) ? null : variantId
+            ).orElse(null);
 
             if (item == null) {
                 throw new OutOfStockException("ITEM_NOT_FOUND");
@@ -134,9 +136,7 @@ public class InventoryService {
 
     /**
      * Confirm: evicts because reserved→confirmed changes availability.
-     * Note: We evict all entries because we don't have restaurantId in scope here.
      */
-    @CacheEvict(value = "ownerInventory", allEntries = true)
     public void confirmReservation(String orderId) {
 
         InventoryReservation reservation = reservationRepo.findByOrderId(orderId).orElse(null);
@@ -161,9 +161,11 @@ public class InventoryService {
 
         reservation.setStatus(ReservationStatus.CONFIRMED);
         reservationRepo.save(reservation);
+
+        // Selective Cache Eviction
+        evictCache(reservation.getRestaurantId());
     }
 
-    @CacheEvict(value = "ownerInventory", allEntries = true)
     public void releaseByOrderId(String orderId) {
 
         InventoryReservation reservation = reservationRepo.findByOrderId(orderId).orElse(null);
@@ -188,6 +190,9 @@ public class InventoryService {
 
         reservation.setStatus(ReservationStatus.RELEASED);
         reservationRepo.save(reservation);
+
+        // Selective Cache Eviction
+        evictCache(reservation.getRestaurantId());
     }
 
     /* =========================================================
@@ -427,18 +432,17 @@ public class InventoryService {
     }
 
     @Transactional
-    @CacheEvict(value = "ownerInventory", key = "#req.restaurantId")
     public void createInventoryItem(CreateInventoryItemRequest req) {
         String variantId = req.getVariantId();
         if (variantId != null && variantId.isBlank()) {
             variantId = null;
         }
-        // Check if inventory already exists
-        InventoryItem item = StringUtils.isBlank(variantId)
-                ? inventoryItemRepo.findAllByRestaurantIdAndMenuItemId(req.getRestaurantId(), req.getMenuItemId()).stream()
-                    .filter(i -> i.getMenuItemId().equals(req.getMenuItemId()))
-                    .findFirst().orElse(null)
-                : inventoryItemRepo.findByRestaurantIdAndMenuItemIdAndVariantId(req.getRestaurantId(), req.getMenuItemId(), variantId).orElse(null);
+        // Precise lookup (checks for null variant correctly)
+        InventoryItem item = inventoryItemRepo.findByRestaurantIdAndMenuItemIdAndVariantId(
+                req.getRestaurantId(),
+                req.getMenuItemId(),
+                variantId
+        ).orElse(null);
         
         if (!ObjectUtils.isEmpty(item))
             throw new IllegalStateException("Inventory already exists");
@@ -464,5 +468,13 @@ public class InventoryService {
         stock.setUpdatedAt(now);
 
         stockRepo.save(stock);
+        evictCache(req.getRestaurantId());
+    }
+
+    private void evictCache(Long restaurantId) {
+        if (restaurantId != null && cacheManager.getCache("ownerInventory") != null) {
+            cacheManager.getCache("ownerInventory").evict(restaurantId);
+            log.info("Evicted ownerInventory cache for restaurant {}", restaurantId);
+        }
     }
 }

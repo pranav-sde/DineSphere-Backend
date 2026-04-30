@@ -2,12 +2,13 @@ package com.festora.inventoryservice.service;
 
 import com.festora.inventoryservice.entity.*;
 import com.festora.inventoryservice.repo.*;
+import org.springframework.cache.CacheManager;
 import org.springframework.transaction.annotation.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
-import java.util.List;
+import java.util.*;
 
 @Service
 @RequiredArgsConstructor
@@ -17,6 +18,7 @@ public class InventoryTtlCleanupService {
     private final InventoryReservationRepository reservationRepo;
     private final InventoryReservationItemRepository reservationItemRepo;
     private final InventoryStockRepository stockRepo;
+    private final CacheManager cacheManager;
 
     @Transactional
     public void cleanupExpiredReservations() {
@@ -28,6 +30,10 @@ public class InventoryTtlCleanupService {
                         com.festora.inventoryservice.enums.ReservationStatus.TEMP_RESERVED,
                         now
                 );
+
+        if (expiredReservations.isEmpty()) return;
+
+        Set<Long> restaurantsToEvict = new HashSet<>();
 
         for (InventoryReservation reservation : expiredReservations) {
 
@@ -42,10 +48,13 @@ public class InventoryTtlCleanupService {
                             reservation.getReservationId()
                     );
 
-            for (InventoryReservationItem item : items) {
+            // Collect all inventory item IDs for this reservation to batch fetch stocks
+            List<String> invItemIds = items.stream().map(InventoryReservationItem::getInventoryItemId).toList();
+            Map<String, InventoryStock> stockMap = new HashMap<>();
+            stockRepo.findAllById(invItemIds).forEach(s -> stockMap.put(s.getInventoryItemId(), s));
 
-                InventoryStock stock =
-                        stockRepo.findById(item.getInventoryItemId()).orElse(null);
+            for (InventoryReservationItem item : items) {
+                InventoryStock stock = stockMap.get(item.getInventoryItemId());
 
                 if (stock == null) {
                     log.error(
@@ -55,9 +64,7 @@ public class InventoryTtlCleanupService {
                     continue;
                 }
 
-                int newReserved =
-                        stock.getReservedQty() - item.getQuantity();
-
+                int newReserved = stock.getReservedQty() - item.getQuantity();
                 stock.setReservedQty(Math.max(newReserved, 0));
                 stock.setUpdatedAt(now);
                 stockRepo.save(stock);
@@ -67,6 +74,21 @@ public class InventoryTtlCleanupService {
                     com.festora.inventoryservice.enums.ReservationStatus.RELEASED
             );
             reservationRepo.save(reservation);
+            
+            if (reservation.getRestaurantId() != null) {
+                restaurantsToEvict.add(reservation.getRestaurantId());
+            }
+        }
+
+        // Batch evict caches
+        for (Long rid : restaurantsToEvict) {
+            evictCache(rid);
+        }
+    }
+
+    private void evictCache(Long restaurantId) {
+        if (restaurantId != null && cacheManager.getCache("ownerInventory") != null) {
+            cacheManager.getCache("ownerInventory").evict(restaurantId);
         }
     }
 }

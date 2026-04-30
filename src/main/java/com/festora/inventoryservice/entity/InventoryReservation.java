@@ -16,6 +16,7 @@ public class InventoryReservation {
     @Indexed(unique = true)
     private String orderId;
 
+    private Long restaurantId;
     private ReservationStatus status;
 
     private long expiresAt;
