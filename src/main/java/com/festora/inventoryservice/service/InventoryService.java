@@ -202,9 +202,20 @@ public class InventoryService {
     @Cacheable(value = "ownerInventory", key = "#restaurantId")
     public List<OwnerInventoryResponse> getInventory(Long restaurantId) {
         log.info("Cache MISS: fetching inventory from DB for restaurant {}", restaurantId);
-        return inventoryItemRepo.findAllByRestaurantId(restaurantId)
-                .stream()
-                .map(this::toResponse)
+        
+        List<InventoryItem> items = inventoryItemRepo.findAllByRestaurantId(restaurantId);
+        if (items.isEmpty()) return new ArrayList<>();
+
+        // 1. Collect all item IDs for batch stock lookup
+        List<String> itemIds = items.stream().map(InventoryItem::getId).toList();
+
+        // 2. Fetch all stocks in one go (Batch Fetch)
+        Map<String, InventoryStock> stockMap = new HashMap<>();
+        stockRepo.findAllById(itemIds).forEach(s -> stockMap.put(s.getInventoryItemId(), s));
+
+        // 3. Map to response without further DB calls
+        return items.stream()
+                .map(item -> toResponseOptimized(item, stockMap.get(item.getId())))
                 .toList();
     }
 
@@ -350,32 +361,31 @@ public class InventoryService {
        HELPERS
        ========================================================= */
 
-    private OwnerInventoryResponse toResponse(InventoryItem item) {
+    /**
+     * Optimized response mapper that uses pre-fetched stock.
+     * No DB writes or extra queries here.
+     */
+    private OwnerInventoryResponse toResponseOptimized(InventoryItem item, InventoryStock stock) {
+        int reserved = (stock != null) ? stock.getReservedQty() : 0;
+        int confirmed = (stock != null) ? stock.getConfirmedQty() : 0;
 
-        InventoryStock stock = stockRepo.findById(item.getId())
-                .orElseGet(() -> {
-                    InventoryStock s = new InventoryStock();
-                    s.setInventoryItemId(item.getId());
-                    s.setReservedQty(0);
-                    s.setConfirmedQty(0);
-                    s.setUpdatedAt(System.currentTimeMillis());
-                    return stockRepo.save(s);
-                });
-
-        int available =
-                item.getTotalStock()
-                        - (stock.getReservedQty() + stock.getConfirmedQty());
+        int available = item.getTotalStock() - (reserved + confirmed);
 
         return OwnerInventoryResponse.builder()
                 .inventoryItemId(item.getId())
                 .menuItemId(item.getMenuItemId())
                 .variantId(item.getVariantId())
                 .totalStock(item.getTotalStock())
-                .reserved(stock.getReservedQty())
-                .confirmed(stock.getConfirmedQty())
+                .reserved(reserved)
+                .confirmed(confirmed)
                 .available(available)
                 .enabled(item.isEnabled())
                 .build();
+    }
+
+    private OwnerInventoryResponse toResponse(InventoryItem item) {
+        InventoryStock stock = stockRepo.findById(item.getId()).orElse(null);
+        return toResponseOptimized(item, stock);
     }
 
     private void validateRequest(InventoryReserveRequest request) {
