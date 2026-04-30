@@ -4,6 +4,7 @@ import com.festora.cartservice.dto.AddToCartRequest;
 import com.festora.cartservice.dto.CheckoutRequest;
 import com.festora.cartservice.dto.MenuValidationResult;
 import com.festora.cartservice.dto.UpdateCartItemRequest;
+import com.festora.cartservice.exception.CartExceptionHandler;
 import com.festora.cartservice.model.AddonSnapshot;
 import com.festora.cartservice.model.Cart;
 import com.festora.cartservice.model.CartItem;
@@ -193,7 +194,7 @@ public class CartService {
         return cartRepo.save(cart);
     }
 
-    public Object checkout(CheckoutRequest req) {
+    public Object checkout(CheckoutRequest req) throws Exception {
         Cart cart = cartRepo.findByRestaurantIdAndTableNumberAndUserId(
                 req.getRestaurantId(), req.getTableNumber(), req.getUserId()
         ).orElseThrow(() -> new NoSuchElementException("Cart not found"));
@@ -246,13 +247,7 @@ public class CartService {
                         .toList()
         );
 
-        Order order;
-        try {
-            order = orderService.createOrder(orderRequest);
-        } catch (Exception e) {
-            log.error("Checkout failed: {}", e.getMessage());
-            throw new RuntimeException("Order creation failed: " + e.getMessage());
-        }
+        Order order = orderService.createOrder(orderRequest);
 
         // Step 4: Clear cart
         cartRepo.delete(cart);

@@ -18,10 +18,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.util.ObjectUtils;
 
-import java.util.List;
-import java.util.Map;
-import java.util.HashMap;
-import java.util.ArrayList;
+import java.util.*;
 
 @Service
 @RequiredArgsConstructor
@@ -74,14 +71,40 @@ public class InventoryService {
 
         for (ReservedItemRequest reqItem : request.getItems()) {
             String variantId = reqItem.getVariantId();
+            String effectiveVariantId = StringUtils.isBlank(variantId) ? null : variantId;
 
-            InventoryItem item = inventoryItemRepo.findByRestaurantIdAndMenuItemIdAndVariantId(
+            // Try exact match
+            Optional<InventoryItem> itemOpt = inventoryItemRepo.findByRestaurantIdAndMenuItemIdAndVariantId(
                     request.getRestaurantId(),
                     reqItem.getMenuItemId(),
-                    StringUtils.isBlank(variantId) ? null : variantId
-            ).orElse(null);
+                    effectiveVariantId
+            );
+
+            // Fallback: If not found and searching for null, try searching for empty string ""
+            if (itemOpt.isEmpty() && effectiveVariantId == null) {
+                itemOpt = inventoryItemRepo.findByRestaurantIdAndMenuItemIdAndVariantId(
+                        request.getRestaurantId(),
+                        reqItem.getMenuItemId(),
+                        ""
+                );
+            }
+
+            InventoryItem item = itemOpt.orElse(null);
 
             if (item == null) {
+                log.error("ITEM_NOT_FOUND: Restaurant={}, Menu={}, Variant={}", 
+                        request.getRestaurantId(), reqItem.getMenuItemId(), effectiveVariantId);
+                
+                // Diagnostic: Check if item exists AT ALL for this restaurant
+                List<InventoryItem> variations = inventoryItemRepo.findAllByRestaurantIdAndMenuItemId(
+                        request.getRestaurantId(), reqItem.getMenuItemId());
+                if (variations.isEmpty()) {
+                    log.error("DIAGNOSTIC: No inventory records exist AT ALL for menuItemId={}", reqItem.getMenuItemId());
+                } else {
+                    log.error("DIAGNOSTIC: Found {} variations for this menuItemId, but none matched the requested variantId.", variations.size());
+                    variations.forEach(v -> log.error("   -> Existing Variant in DB: '{}'", v.getVariantId()));
+                }
+                
                 throw new OutOfStockException("ITEM_NOT_FOUND");
             }
             if (!item.isEnabled()) {
@@ -237,7 +260,8 @@ public class InventoryService {
             throw new IllegalStateException("Cannot reduce stock below confirmed quantity");
         }
 
-        item.setTotalStock(req.getNewTotalStock() + item.getTotalStock());
+        // Fix: Use absolute value instead of additive to prevent runaway numbers
+        item.setTotalStock(req.getNewTotalStock());
         item.setUpdatedAt(System.currentTimeMillis());
         inventoryItemRepo.save(item);
     }
@@ -302,7 +326,8 @@ public class InventoryService {
                     throw new IllegalStateException("Cannot reduce stock below confirmed quantity for item: " + item.getId());
                 }
 
-                item.setTotalStock(upsertReq.getTotalStock() + item.getTotalStock());
+                // Fix: Use absolute value instead of additive
+                item.setTotalStock(upsertReq.getTotalStock());
                 item.setUpdatedAt(now);
                 itemsToSave.add(item);
                 updateCount++;

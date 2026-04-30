@@ -100,10 +100,15 @@ public class CartController {
         request.setRestaurantId(restaurantId);
         request.setUserId(userId);
         request.setDeviceId(deviceId);
-        request.setTableNumber(tableNumber);
+        if (tableNumber != null) {
+            request.setTableNumber(tableNumber);
+        }
 
-        return cartService.checkout(request);
+        try {
+            return cartService.checkout(request);
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
     }
-
 }
 

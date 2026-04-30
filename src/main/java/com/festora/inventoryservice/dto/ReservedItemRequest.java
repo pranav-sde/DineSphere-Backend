@@ -1,6 +1,7 @@
 package com.festora.inventoryservice.dto;
 
 import lombok.Data;
+import java.util.List;
 
 @Data
 public class ReservedItemRequest {

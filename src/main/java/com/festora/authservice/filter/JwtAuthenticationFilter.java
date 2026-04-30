@@ -47,7 +47,8 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             Object ridObj = claims.get("restaurantId");
             Long restaurantId = (ridObj instanceof Number) ? ((Number) ridObj).longValue() : null;
             
-            Integer tableNumber = claims.get("tableNumber", Integer.class);
+            Object tableObj = claims.get("tableNumber");
+            Integer tableNumber = (tableObj instanceof Number) ? ((Number) tableObj).intValue() : null;
             String deviceId = claims.get("deviceId", String.class);
             String role = claims.get("role", String.class);
 
