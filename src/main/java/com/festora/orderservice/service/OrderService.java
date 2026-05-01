@@ -10,6 +10,7 @@ import com.festora.orderservice.gst.GstCalculator;
 import com.festora.orderservice.model.Order;
 import com.festora.orderservice.model.OrderItem;
 import com.festora.orderservice.repository.OrderRepository;
+import com.festora.authservice.repository.QrTableMappingRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
@@ -31,6 +32,7 @@ public class OrderService {
     private final InventoryClient inventoryClient;
     private final GstCalculator gstCalculator;
     private final MenuClient menuClient;
+    private final QrTableMappingRepository qrTableMappingRepository;
 
     public Order createOrder(CreateOrderRequest req) throws Exception {
         if (ObjectUtils.isEmpty(req)) {
@@ -522,5 +524,35 @@ public class OrderService {
         long endOfDay = today.plusDays(1).atStartOfDay(kolkataZone).toInstant().toEpochMilli() - 1;
 
         return orderRepository.findByRestaurantIdAndCreatedAtBetween(restaurantId, startOfDay, endOfDay);
+    }
+
+    public DashboardSummaryResponse getDashboardSummary(Long restaurantId) throws Exception {
+        List<Order> todayOrders = fetchTodaysAllOrders(restaurantId);
+        long totalTables = qrTableMappingRepository.countByRestaurantId(restaurantId);
+
+        double revenue = todayOrders.stream()
+                .filter(o -> o.getStatus() != OrderStatus.CANCELLED && o.getStatus() != OrderStatus.REJECTED)
+                .mapToDouble(Order::getTotalAmount)
+                .sum();
+
+        long activeTablesCount = todayOrders.stream()
+                .filter(o -> List.of(OrderStatus.CREATED, OrderStatus.PENDING, OrderStatus.PREPARING, OrderStatus.PAYMENT_PENDING).contains(o.getStatus()))
+                .map(Order::getTableNumber)
+                .distinct()
+                .count();
+
+        List<Order> validOrders = todayOrders.stream()
+                .filter(o -> o.getStatus() != OrderStatus.CANCELLED && o.getStatus() != OrderStatus.REJECTED)
+                .toList();
+        
+        double avgValue = validOrders.isEmpty() ? 0 : revenue / validOrders.size();
+
+        return DashboardSummaryResponse.builder()
+                .totalOrders(todayOrders.size())
+                .todayRevenue(revenue)
+                .activeTables((int) activeTablesCount)
+                .totalTables(totalTables)
+                .avgOrderValue(avgValue)
+                .build();
     }
 }

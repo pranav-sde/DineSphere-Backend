@@ -1,5 +1,6 @@
 package com.festora.orderservice.controller;
 
+import com.festora.orderservice.dto.DashboardSummaryResponse;
 import com.festora.orderservice.dto.UpdateOrderItemsRequest;
 import com.festora.orderservice.model.Order;
 import com.festora.orderservice.service.OrderService;
@@ -62,6 +63,15 @@ public class OwnerOrderController {
             return ResponseEntity.ok(todayOrders);
         } catch (Exception e) {
             System.out.println(e.getMessage());
+            return ResponseEntity.badRequest().build();
+        }
+    }
+
+    @GetMapping("/dashboard/summary")
+    public ResponseEntity<DashboardSummaryResponse> getDashboardSummary(@RequestHeader("X-Restaurant-Id") Long restaurantId) {
+        try {
+            return ResponseEntity.ok(orderService.getDashboardSummary(restaurantId));
+        } catch (Exception e) {
             return ResponseEntity.badRequest().build();
         }
     }

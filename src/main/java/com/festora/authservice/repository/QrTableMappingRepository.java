@@ -10,4 +10,5 @@ import java.util.Optional;
 public interface QrTableMappingRepository extends MongoRepository<QrTableMapping, String> {
     QrTableMapping findByRestaurantIdAndTableNumber(Long restaurantId, Integer tableNumber);
     Optional<QrTableMapping> findByQrId(String qrId);
+    long countByRestaurantId(Long restaurantId);
 }
