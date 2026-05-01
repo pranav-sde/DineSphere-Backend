@@ -13,23 +13,22 @@ import java.util.List;
 @RequiredArgsConstructor
 public class OrderExpiryScheduler {
 
-    private static final long EXPIRY_WINDOW =  3 * 60 * 60 * 1000L; // 3 hours
+    private static final long EXPIRY_WINDOW =  2 * 60 * 60 * 1000L; // 2 hours
 
     private final OrderRepository orderRepo;
     private final OrderService orderService;
 
-    @Scheduled(fixedDelay = 60_000)
+    @Scheduled(fixedDelay = 120_000)
     public void expireOrders() {
 
         long cutoff = System.currentTimeMillis() - EXPIRY_WINDOW;
 
+        // Only expire stuck orders that never reached the kitchen
         List<Order> expiredOrders =
                 orderRepo.findByStatusInAndUpdatedAtBefore(
                         List.of(
                                 OrderStatus.CREATED,
-                                OrderStatus.PENDING,
-                                OrderStatus.PAYMENT_PENDING,
-                                OrderStatus.PREPARING
+                                OrderStatus.PENDING
                         ),
                         cutoff
                 );

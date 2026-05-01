@@ -39,6 +39,12 @@ public class InventoryClientImpl implements InventoryClient {
         log.info("Directly calling InventoryService.confirm Reservation for order: {}", orderId);
         inventoryService.confirmReservation(orderId);
     }
+    
+    @Override
+    public void release(String orderId) {
+        log.info("Directly calling InventoryService.release for order: {}", orderId);
+        inventoryService.releaseByOrderId(orderId);
+    }
 
     private com.festora.inventoryservice.dto.InventoryReserveRequest mapRequest(Order order) {
         com.festora.inventoryservice.dto.InventoryReserveRequest request = new com.festora.inventoryservice.dto.InventoryReserveRequest();

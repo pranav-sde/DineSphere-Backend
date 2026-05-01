@@ -247,7 +247,6 @@ public class InventoryService {
                 .toList();
     }
 
-    @CacheEvict(value = "ownerInventory", allEntries = true)
     public void updateTotalStock(UpdateStockRequest req) {
 
         InventoryItem item = inventoryItemRepo.findById(req.getInventoryItemId())
@@ -264,10 +263,11 @@ public class InventoryService {
         item.setTotalStock(req.getNewTotalStock());
         item.setUpdatedAt(System.currentTimeMillis());
         inventoryItemRepo.save(item);
+        evictCache(item.getRestaurantId());
     }
 
     @Transactional
-    @CacheEvict(value = "ownerInventory", allEntries = true)
+    @CacheEvict(value = "ownerInventory", key = "#restaurantId")
     public void bulkUpsertStock(BulkUpdateStockRequest req, Long restaurantId) {
         if (req.getItems() == null || req.getItems().isEmpty()) {
             throw new IllegalArgumentException("Items list cannot be empty");
@@ -376,7 +376,6 @@ public class InventoryService {
         log.info("Bulk upsert finished: {} total saved ({} updates, {} inserts)", savedItems.size(), updateCount, insertCount);
     }
 
-    @CacheEvict(value = "ownerInventory", allEntries = true)
     public void toggleInventory(ToggleInventoryRequest req) {
 
         InventoryItem item = inventoryItemRepo.findById(req.getInventoryItemId())
@@ -385,6 +384,7 @@ public class InventoryService {
         item.setEnabled(req.isEnabled());
         item.setUpdatedAt(System.currentTimeMillis());
         inventoryItemRepo.save(item);
+        evictCache(item.getRestaurantId());
     }
 
     /* =========================================================

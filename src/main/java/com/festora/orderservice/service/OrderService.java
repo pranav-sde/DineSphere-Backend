@@ -140,9 +140,7 @@ public class OrderService {
         order.setUpdatedAt(now());
         orderRepository.save(order);
 
-        OrderCancelledProducerEvent cancelEvent = buildOrderCancelledEvent(order);
-//        if (cancelEvent != null)
-//            orderEventProduce.publishOrderCancelledEvent(cancelEvent);
+        inventoryClient.release(orderId);
     }
 
     private OrderCancelledProducerEvent buildOrderCancelledEvent(Order order) {

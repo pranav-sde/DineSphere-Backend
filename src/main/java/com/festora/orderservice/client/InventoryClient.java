@@ -10,5 +10,6 @@ public interface InventoryClient {
     void tempReserve(Order order);
     void tempReserve(Order order, List<OrderItem> item);
     void confirm(String orderId);
+    void release(String orderId);
 }
 
