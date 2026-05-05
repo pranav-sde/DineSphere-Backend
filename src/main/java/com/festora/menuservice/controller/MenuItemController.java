@@ -6,6 +6,7 @@ import com.festora.menuservice.dto.MenuPriceRequest;
 import com.festora.menuservice.service.MenuItemService;
 import com.festora.menuservice.dto.MenuItemPriceResponse;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -13,6 +14,7 @@ import org.springframework.web.bind.annotation.*;
 @RestController
 @RequestMapping("/menu")
 @RequiredArgsConstructor
+@Slf4j
 public class MenuItemController {
 
     private final MenuItemService menuItemService;
@@ -100,10 +102,13 @@ public class MenuItemController {
         try {
             MenuItemPageResponse response = menuItemService.getMenuItemsForCustomers(rid, categoryId);
             return ResponseEntity.ok(response);
+        } catch (IllegalArgumentException e) {
+            log.error("Bad request for menu items: {}", e.getMessage());
+            return ResponseEntity.badRequest().build();
         } catch (Exception e) {
-            System.out.println(e.getMessage());
+            log.error("Internal error fetching menu items: ", e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
         }
-        return new ResponseEntity<>(HttpStatus.BAD_REQUEST);
     }
 }
 

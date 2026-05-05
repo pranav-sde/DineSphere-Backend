@@ -17,12 +17,15 @@ import org.springframework.data.redis.serializer.GenericJackson2JsonRedisSeriali
 import org.springframework.data.redis.serializer.RedisSerializationContext;
 import org.springframework.data.redis.serializer.StringRedisSerializer;
 
+import lombok.extern.slf4j.Slf4j;
+
 import java.time.Duration;
 import java.util.Collection;
 import java.util.concurrent.Callable;
 
 @Configuration
 @EnableCaching
+@Slf4j
 public class MonolithRedisConfig {
 
     @Bean
@@ -45,8 +48,8 @@ public class MonolithRedisConfig {
         template.setKeySerializer(new StringRedisSerializer());
         template.setHashKeySerializer(new StringRedisSerializer());
         
-        template.setValueSerializer(new GenericJackson2JsonRedisSerializer(redisObjectMapper));
-        template.setHashValueSerializer(new GenericJackson2JsonRedisSerializer(redisObjectMapper));
+        template.setValueSerializer(new GenericJackson2JsonRedisSerializer());
+        template.setHashValueSerializer(new GenericJackson2JsonRedisSerializer());
         
         template.afterPropertiesSet();
         return template;
@@ -54,9 +57,10 @@ public class MonolithRedisConfig {
 
     @Bean
     @Primary
-    public CacheManager cacheManager(RedisConnectionFactory connectionFactory, ObjectMapper objectMapper) {
+    public CacheManager cacheManager(RedisConnectionFactory connectionFactory) {
         // 1. Setup Redis (L2) Cache Manager
-        GenericJackson2JsonRedisSerializer serializer = new GenericJackson2JsonRedisSerializer(objectMapper);
+        // Use an isolated serializer that doesn't affect global Jackson settings
+        GenericJackson2JsonRedisSerializer serializer = new GenericJackson2JsonRedisSerializer();
         RedisCacheConfiguration redisConfig = RedisCacheConfiguration.defaultCacheConfig()
                 .entryTtl(Duration.ofHours(24)) // Long life in Redis
                 .serializeValuesWith(RedisSerializationContext.SerializationPair.fromSerializer(serializer))
@@ -118,36 +122,58 @@ public class MonolithRedisConfig {
 
         @Override
         public ValueWrapper get(Object key) {
-            // 1. Check RAM
-            ValueWrapper wrapper = l1.get(key);
-            if (wrapper != null) return wrapper;
+            try {
+                // 1. Check RAM
+                ValueWrapper wrapper = l1.get(key);
+                if (wrapper != null) return wrapper;
 
-            // 2. Check Redis
-            wrapper = l2.get(key);
-            if (wrapper != null) {
-                l1.put(key, wrapper.get()); // Populate RAM for next time
+                // 2. Check Redis
+                wrapper = l2.get(key);
+                if (wrapper != null) {
+                    l1.put(key, wrapper.get()); // Populate RAM for next time
+                }
+                return wrapper;
+            } catch (Exception e) {
+                log.warn("Cache access error for key {}: {}. Evicting corrupted key.", key, e.getMessage());
+                try { l2.evict(key); } catch (Exception ignore) {} 
+                return null;
             }
-            return wrapper;
         }
 
         @Override
         public <T> T get(Object key, Class<T> type) {
-            T value = l1.get(key, type);
-            if (value != null) return value;
+            try {
+                T value = l1.get(key, type);
+                if (value != null) return value;
 
-            value = l2.get(key, type);
-            if (value != null) {
-                l1.put(key, value);
+                value = l2.get(key, type);
+                if (value != null) {
+                    l1.put(key, value);
+                }
+                return value;
+            } catch (Exception e) {
+                log.warn("Cache type mismatch for key {}: {}. Evicting corrupted key.", key, e.getMessage());
+                try { l2.evict(key); } catch (Exception ignore) {}
+                return null;
             }
-            return value;
         }
 
         @Override
         public <T> T get(Object key, Callable<T> valueLoader) {
-            return l1.get(key, () -> {
-                T value = l2.get(key, valueLoader);
-                return value;
-            });
+            try {
+                return l1.get(key, () -> {
+                    T value = l2.get(key, valueLoader);
+                    return value;
+                });
+            } catch (Exception e) {
+                log.warn("Cache loader error for key {}: {}. Evicting corrupted key.", key, e.getMessage());
+                try { l2.evict(key); } catch (Exception ignore) {}
+                try {
+                    return valueLoader.call();
+                } catch (Exception ex) {
+                    throw new RuntimeException(ex);
+                }
+            }
         }
 
         @Override
