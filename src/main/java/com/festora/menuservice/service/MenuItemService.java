@@ -9,8 +9,10 @@ import com.festora.menuservice.entity.Variant;
 import com.festora.menuservice.mapper.MenuMapper;
 import com.festora.menuservice.repository.MenuItemRepository;
 import com.festora.menuservice.dto.MenuItemPriceResponse;
+import com.festora.monolith.util.RedisUtils;
 import io.micrometer.common.util.StringUtils;
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.CacheManager;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
@@ -28,11 +30,10 @@ public class MenuItemService {
 
     private final MenuItemRepository itemRepo;
     private final MenuMapper menuMapper;
+    private final RedisUtils redisUtils;
+    private final CacheManager cacheManager;
 
-    @Cacheable(
-            value = "menuCache",
-            key = "'menu:' + #restaurantId + ':cat:' + #categoryId"
-    )
+    @Cacheable(value = "menuCache", key = "'menu:' + #restaurantId + ':cat:' + #categoryId")
     public List<MenuItemDto> getMenuItemsByCategory(
             Long restaurantId,
             String categoryId
@@ -192,11 +193,27 @@ public class MenuItemService {
                 .build();
     }
 
-    @Cacheable(value = "menuCache", key = "'customerMenu:' + #restaurantId + ':' + #categoryId")
     public MenuItemPageResponse getMenuItemsForCustomers(Long restaurantId, String categoryId) {
         if (restaurantId == null || restaurantId == 0)
             throw new IllegalArgumentException("Restaurant Id is Empty");
 
+        String cacheKey = "customerMenu:" + restaurantId + ":" + (categoryId == null ? "all" : categoryId);
+
+        // 1. Try RAM/Layer1 first (Fastest)
+        var ramCache = cacheManager.getCache("menuCache");
+        if (ramCache != null) {
+            MenuItemPageResponse ramResult = ramCache.get(cacheKey, MenuItemPageResponse.class);
+            if (ramResult != null) return ramResult;
+        }
+
+        // 2. Try Compressed Redis/ Layer2 upStash (Z-Get)
+        MenuItemPageResponse cached = redisUtils.zget(cacheKey, MenuItemPageResponse.class);
+        if (cached != null) {
+            if (ramCache != null) ramCache.put(cacheKey, cached); // Backfill RAM
+            return cached;
+        }
+
+        // 2. Database Fallback
         List<MenuItemDto> items;
         if (StringUtils.isBlank(categoryId)) {
             items = itemRepo.findByRestaurantId(restaurantId)
@@ -211,11 +228,17 @@ public class MenuItemService {
                     .toList();
         }
 
-        return MenuItemPageResponse.builder()
+        MenuItemPageResponse response = MenuItemPageResponse.builder()
                 .items(items)
                 .totalElements(ObjectUtils.isEmpty(items) ? 0 : items.size())
                 .build();
+
+        // 3. Save to both (RAM and Compressed Redis)
+        if (ramCache != null) ramCache.put(cacheKey, response);
+        redisUtils.zput(cacheKey, response, 24, java.util.concurrent.TimeUnit.HOURS);
+
+        return response;
     }
 }
 
-
+

@@ -2,6 +2,8 @@ package com.festora.menuservice.entity;
 
 import lombok.*;
 import org.springframework.data.annotation.Id;
+import org.springframework.data.mongodb.core.index.CompoundIndex;
+import org.springframework.data.mongodb.core.index.CompoundIndexes;
 import org.springframework.data.mongodb.core.index.Indexed;
 import org.springframework.data.mongodb.core.mapping.Document;
 
@@ -12,6 +14,9 @@ import java.util.List;
 @NoArgsConstructor
 @AllArgsConstructor
 @Document("menu_items")
+@CompoundIndexes({
+    @CompoundIndex(name = "restaurant_category_idx", def = "{'restaurantId': 1, 'categoryId': 1, 'enabled': 1}")
+})
 public class MenuItem {
 
     @Id
