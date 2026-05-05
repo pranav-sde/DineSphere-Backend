@@ -8,5 +8,6 @@ import lombok.Data;
 public class SessionStartResponse {
     private Integer tableNumber;
     private String sessionToken;
+    private String refreshToken;
     private long expiresIn;
 }

@@ -48,6 +48,7 @@ public class SessionValidationFilter extends OncePerRequestFilter {
                 uri.startsWith("/auth/refresh") ||
                 uri.startsWith("/auth/logout") ||
                 uri.startsWith("/auth/session/start") ||
+                uri.startsWith("/auth/session/refresh") ||
                 uri.startsWith("/menu/") ||
                 uri.startsWith("/actuator/") ||
                 uri.endsWith("/health")) {
