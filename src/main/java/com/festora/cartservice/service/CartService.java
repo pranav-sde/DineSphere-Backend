@@ -1,9 +1,6 @@
 package com.festora.cartservice.service;
 
-import com.festora.cartservice.dto.AddToCartRequest;
-import com.festora.cartservice.dto.CheckoutRequest;
-import com.festora.cartservice.dto.MenuValidationResult;
-import com.festora.cartservice.dto.UpdateCartItemRequest;
+import com.festora.cartservice.dto.*;
 import com.festora.cartservice.exception.CartExceptionHandler;
 import com.festora.cartservice.model.AddonSnapshot;
 import com.festora.cartservice.model.Cart;
@@ -16,9 +13,15 @@ import com.festora.orderservice.service.OrderService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.util.CollectionUtils;
 import org.springframework.util.ObjectUtils;
 
 import java.util.*;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Executor;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -28,53 +31,87 @@ public class CartService {
     private final CartRepository cartRepo;
     private final MenuLocalValidator menuValidator;
     private final OrderService orderService;
+    private final Executor cartExecutor;
 
-    public Cart addItem(AddToCartRequest req) {
+    public Cart addItem(AddToCartRequest cartReq) {
 
-        if (ObjectUtils.isEmpty(req) || req.getQuantity() <= 0) {
-            throw new IllegalArgumentException("Quantity must be >= 1");
+        if (ObjectUtils.isEmpty(cartReq) || CollectionUtils.isEmpty(cartReq.getItems())) {
+            throw new IllegalArgumentException("Cart items cannot be empty");
         }
 
+        Long restaurantId = cartReq.getRestaurantId();
+        Integer tableNum = cartReq.getTableNumber();
+        String sessionId = cartReq.getSessionId();
+
         Cart cart = cartRepo.findByRestaurantIdAndTableNumberAndUserId(
-                req.getRestaurantId(), req.getTableNumber(), req.getSessionId()
-        ).orElseGet(() -> {
-            long now = System.currentTimeMillis();
-            return Cart.builder()
-                    .cartId(UUID.randomUUID().toString())
-                    .restaurantId(req.getRestaurantId())
-                    .userId(req.getSessionId())
-                    .tableNumber(req.getTableNumber())
-                    .createdAt(now)
-                    .updatedAt(now)
-                    .items(new ArrayList<>())
-                    .subtotal(0)
-                    .build();
-        });
+                restaurantId, tableNum, sessionId
+        ).orElseGet(() -> createNewCart(restaurantId, tableNum, sessionId));
 
-        MenuValidationResult menuResult = menuValidator.validate(req.getRestaurantId(), req.getMenuItemId(),
-                req.getVariantId(), req.getAddonIds());
+        Map<String, CartItem> itemMap = cart.getItems().stream()
+                .collect(Collectors.toConcurrentMap(CartItem::getIdentityKey, Function.identity(), (existing, replacement) -> existing, ConcurrentHashMap::new));
 
-        double unitPrice =
-                menuResult.getVariantPrice()
-                        + menuResult.getAddons()
-                        .stream()
-                        .mapToDouble(AddonSnapshot::getPrice)
-                        .sum();
+        List<CompletableFuture<Void>> futures = cartReq.getItems().stream()
+                .map(req -> CompletableFuture.runAsync(() ->
+                        processItem(req, restaurantId, itemMap), cartExecutor))
+                .toList();
 
-        String identityKey = buildIdentity(req.getMenuItemId(), req.getVariantId(),
-                req.getAddonIds());
+        CompletableFuture.allOf(futures.toArray(new CompletableFuture[0])).join();
 
-        Optional<CartItem> existing =
-                cart.getItems().stream()
-                        .filter(i -> i.getIdentityKey().equals(identityKey))
-                        .findFirst();
+        cart.setItems(new ArrayList<>(itemMap.values()));
 
-        if (existing.isPresent()) {
-            CartItem item = existing.get();
-            item.setQuantity(item.getQuantity() + req.getQuantity());
-            item.setTotalPrice(item.getQuantity() * item.getUnitPrice());
-        } else {
-            CartItem item = CartItem.builder()
+        recalcSubtotal(cart);
+        cart.setUpdatedAt(System.currentTimeMillis());
+
+        return cartRepo.save(cart);
+    }
+
+    private Cart createNewCart(Long restaurantId, Integer tableNum, String sessionId) {
+        long now = System.currentTimeMillis();
+        return Cart.builder()
+                .cartId(UUID.randomUUID().toString())
+                .restaurantId(restaurantId)
+                .userId(sessionId)
+                .tableNumber(tableNum)
+                .createdAt(now)
+                .updatedAt(now)
+                .items(new ArrayList<>())
+                .subtotal(0)
+                .build();
+    }
+
+    private void processItem(CartItemDto req, Long restaurantId,
+                             Map<String, CartItem> itemMap) {
+
+        if (ObjectUtils.isEmpty(req) || req.getQuantity() <= 0) {
+            return;
+        }
+
+        MenuValidationResult menuResult = menuValidator.validate(
+                restaurantId,
+                req.getMenuItemId(),
+                req.getVariantId(),
+                req.getAddonIds()
+        );
+
+        double unitPrice = menuResult.getVariantPrice()
+                + menuResult.getAddons().stream()
+                .mapToDouble(AddonSnapshot::getPrice)
+                .sum();
+
+        String identityKey = buildIdentity(
+                req.getMenuItemId(),
+                req.getVariantId(),
+                req.getAddonIds()
+        );
+
+        itemMap.compute(identityKey, (key, existing) -> {
+            if (existing != null) {
+                existing.setQuantity(existing.getQuantity() + req.getQuantity());
+                existing.setTotalPrice(existing.getQuantity() * existing.getUnitPrice());
+                return existing;
+            }
+
+            return CartItem.builder()
                     .cartItemId(UUID.randomUUID().toString())
                     .identityKey(identityKey)
                     .menuItemId(req.getMenuItemId())
@@ -86,14 +123,7 @@ public class CartService {
                     .quantity(req.getQuantity())
                     .totalPrice(unitPrice * req.getQuantity())
                     .build();
-
-            cart.getItems().add(item);
-        }
-
-        recalcSubtotal(cart);
-        cart.setUpdatedAt(System.currentTimeMillis());
-
-        return cartRepo.save(cart);
+        });
     }
 
     public Cart getCart(Long restaurantId, Integer tableNo, String userId) {
