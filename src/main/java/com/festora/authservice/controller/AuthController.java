@@ -1,9 +1,9 @@
 package com.festora.authservice.controller;
 
-import com.festora.authservice.dto.AuthResponse;
-import com.festora.authservice.dto.LoginRequest;
-import com.festora.authservice.dto.RefreshRequest;
+import com.festora.authservice.dto.*;
+import com.festora.authservice.service.AdminUserService;
 import com.festora.authservice.service.AuthService;
+import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -11,9 +11,11 @@ import org.springframework.web.bind.annotation.*;
 public class AuthController {
 
     private final AuthService authService;
+    private final AdminUserService adminUserService;
 
-    public AuthController(AuthService authService) {
+    public AuthController(AuthService authService, AdminUserService adminUserService) {
         this.authService = authService;
+        this.adminUserService = adminUserService;
     }
 
     @GetMapping("/health")
@@ -34,5 +36,31 @@ public class AuthController {
     @PostMapping("/logout")
     public void logout(@RequestBody RefreshRequest req) {
         authService.logout(req.getRefreshToken());
+    }
+
+    @PostMapping("/signup")
+    public UserResponse createOwner(@Valid @RequestBody CreateOwnerRequest request) {
+        return adminUserService.createRestaurantOwner(request);
+    }
+
+    @PostMapping("/renew/{id}")
+    public void renew(@PathVariable String id, @RequestParam int months) {
+        adminUserService.renewSubscription(id, months);
+    }
+
+    @GetMapping("/profile")
+    public com.festora.authservice.dto.OwnerProfileResponse getProfile(jakarta.servlet.http.HttpServletRequest request) {
+        String userId = request.getHeader("X-User-Id");
+        if (userId == null) throw new RuntimeException("Unauthorized");
+        return adminUserService.getProfile(userId);
+    }
+
+    @PutMapping("/profile")
+    public com.festora.authservice.dto.OwnerProfileResponse updateProfile(
+            jakarta.servlet.http.HttpServletRequest request,
+            @RequestBody com.festora.authservice.dto.UpdateProfileRequest body) {
+        String userId = request.getHeader("X-User-Id");
+        if (userId == null) throw new RuntimeException("Unauthorized");
+        return adminUserService.updateProfile(userId, body);
     }
 }

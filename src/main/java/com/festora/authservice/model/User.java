@@ -25,8 +25,26 @@ public class User {
 
     private UserRole role;
 
-    private boolean active = true;
+    private boolean active;
 
+    @Indexed(unique = true)
     @Field("restaurant_id")
     private Long restaurantId;
+
+    private String ownerName;
+
+    @Indexed(unique = true)
+    private String phoneNumber;
+    private String fssaiLicense;
+    private String restaurantName;
+    private String address;
+    private String gstNumber;
+    private boolean enableDelivery;
+    private String deliveryRadius;
+    private String minOrderValue;
+    private String latitude;
+    private String longitude;
+
+    private String subscriptionPlan;
+    private java.time.LocalDateTime subscriptionExpiry;
 }

@@ -39,10 +39,16 @@ public class AuthService {
 
         String access = jwtService.generateAccessToken(user);
         String refresh = refreshTokenService.create(user.getId());
+
+        boolean isSubActive = user.getSubscriptionExpiry() != null &&
+                user.getSubscriptionExpiry().isAfter(java.time.LocalDateTime.now());
+
         return AuthResponse.builder()
                 .accessToken(access)
                 .refreshToken(refresh)
                 .expiresIn(jwtProperties.getAccessTokenTtlMinutes() * 60)
+                .subscriptionActive(isSubActive)
+                .subscriptionExpiry(user.getSubscriptionExpiry())
                 .build();
     }
 
@@ -54,10 +60,15 @@ public class AuthService {
         String newAccess = jwtService.generateAccessToken(user);
         String newRefresh = refreshTokenService.create(userId);
 
+        boolean isSubActive = user.getSubscriptionExpiry() != null &&
+                user.getSubscriptionExpiry().isAfter(java.time.LocalDateTime.now());
+
         return AuthResponse.builder()
                 .accessToken(newAccess)
                 .refreshToken(newRefresh)
                 .expiresIn(jwtProperties.getAccessTokenTtlMinutes() * 60)
+                .subscriptionActive(isSubActive)
+                .subscriptionExpiry(user.getSubscriptionExpiry())
                 .build();
     }
 

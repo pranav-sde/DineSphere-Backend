@@ -18,16 +18,37 @@ public class AdminUserService {
 
     public UserResponse createRestaurantOwner(CreateOwnerRequest req) {
 
-        if (userRepository.existsByEmail(req.getEmail())) {
-            throw new RuntimeException("Email already exists");
+        if (userRepository.existsByEmail(req.getBusinessEmail())) {
+            throw new com.festora.authservice.exception.DuplicateResourceException("Email already exists");
         }
 
+        if (userRepository.existsByPhoneNumber(req.getPhoneNumber())) {
+            throw new com.festora.authservice.exception.DuplicateResourceException("Phone number already exists");
+        }
+
+        Long nextRestaurantId = userRepository.findTopByOrderByRestaurantIdDesc()
+                .map(u -> u.getRestaurantId() + 1)
+                .orElse(1000L);
+
         User user = User.builder()
-                .email(req.getEmail().toLowerCase())
+                .email(req.getBusinessEmail().toLowerCase())
                 .passwordHash(passwordEncoder.encode(req.getPassword()))
                 .role(UserRole.OWNER)
-                .restaurantId(req.getRestaurantId())
+                .restaurantId(nextRestaurantId)
+                .ownerName(req.getOwnerName())
+                .phoneNumber(req.getPhoneNumber())
+                .fssaiLicense(req.getFssaiLicense())
+                .restaurantName(req.getRestaurantName())
+                .address(req.getAddress())
+                .gstNumber(req.getGstNumber())
+                .enableDelivery(req.isEnableDelivery())
+                .deliveryRadius(req.getDeliveryRadius())
+                .minOrderValue(req.getMinOrderValue())
+                .latitude(req.getLatitude())
+                .longitude(req.getLongitude())
                 .active(true)
+                .subscriptionPlan("TRIAL")
+                .subscriptionExpiry(java.time.LocalDateTime.now().plusMonths(1))
                 .build();
 
         User saved = userRepository.save(user);
@@ -39,5 +60,81 @@ public class AdminUserService {
                 saved.getRestaurantId(),
                 saved.isActive()
         );
+    }
+
+    public void renewSubscription(String userId, int months) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        java.time.LocalDateTime currentExpiry = user.getSubscriptionExpiry();
+        java.time.LocalDateTime newExpiry;
+
+        if (currentExpiry == null || currentExpiry.isBefore(java.time.LocalDateTime.now())) {
+            newExpiry = java.time.LocalDateTime.now().plusMonths(months);
+        } else {
+            newExpiry = currentExpiry.plusMonths(months);
+        }
+        user.setActive(true);
+        user.setSubscriptionExpiry(newExpiry);
+        user.setSubscriptionPlan(months + "_MONTHS");
+        userRepository.save(user);
+    }
+
+    public com.festora.authservice.dto.OwnerProfileResponse getProfile(String userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        return com.festora.authservice.dto.OwnerProfileResponse.builder()
+                .id(user.getId())
+                .email(user.getEmail())
+                .ownerName(user.getOwnerName())
+                .phoneNumber(user.getPhoneNumber())
+                .restaurantName(user.getRestaurantName())
+                .address(user.getAddress())
+                .fssaiLicense(user.getFssaiLicense())
+                .gstNumber(user.getGstNumber())
+                .enableDelivery(user.isEnableDelivery())
+                .deliveryRadius(user.getDeliveryRadius())
+                .minOrderValue(user.getMinOrderValue())
+                .latitude(user.getLatitude())
+                .longitude(user.getLongitude())
+                .restaurantId(user.getRestaurantId())
+                .build();
+    }
+
+    public com.festora.authservice.dto.OwnerProfileResponse updateProfile(String userId, com.festora.authservice.dto.UpdateProfileRequest req) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        user.setOwnerName(req.getOwnerName());
+        user.setPhoneNumber(req.getPhoneNumber());
+        user.setRestaurantName(req.getRestaurantName());
+        user.setAddress(req.getAddress());
+        user.setFssaiLicense(req.getFssaiLicense());
+        user.setGstNumber(req.getGstNumber());
+        user.setEnableDelivery(req.isEnableDelivery());
+        user.setDeliveryRadius(req.getDeliveryRadius());
+        user.setMinOrderValue(req.getMinOrderValue());
+        user.setLatitude(req.getLatitude());
+        user.setLongitude(req.getLongitude());
+
+        User saved = userRepository.save(user);
+
+        return com.festora.authservice.dto.OwnerProfileResponse.builder()
+                .id(saved.getId())
+                .email(saved.getEmail())
+                .ownerName(saved.getOwnerName())
+                .phoneNumber(saved.getPhoneNumber())
+                .restaurantName(saved.getRestaurantName())
+                .address(saved.getAddress())
+                .fssaiLicense(saved.getFssaiLicense())
+                .gstNumber(saved.getGstNumber())
+                .enableDelivery(saved.isEnableDelivery())
+                .deliveryRadius(saved.getDeliveryRadius())
+                .minOrderValue(saved.getMinOrderValue())
+                .latitude(saved.getLatitude())
+                .longitude(saved.getLongitude())
+                .restaurantId(saved.getRestaurantId())
+                .build();
     }
 }

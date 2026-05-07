@@ -28,6 +28,11 @@ public class GlobalExceptionHandler {
         return build(HttpStatus.TOO_MANY_REQUESTS, ex.getMessage());
     }
 
+    @ExceptionHandler(DuplicateResourceException.class)
+    public ResponseEntity<ApiError> handleDuplicate(DuplicateResourceException ex) {
+        return build(HttpStatus.CONFLICT, ex.getMessage());
+    }
+
     @ExceptionHandler(JwtException.class)
     public ResponseEntity<ApiError> handleJwt(JwtException ex) {
         return build(HttpStatus.UNAUTHORIZED, "Unauthorized");
