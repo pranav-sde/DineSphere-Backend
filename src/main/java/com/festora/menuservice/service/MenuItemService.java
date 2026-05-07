@@ -42,6 +42,7 @@ public class MenuItemService {
         if (StringUtils.isBlank(categoryId))
             return itemRepo.findByRestaurantId(restaurantId)
                     .stream()
+                    .filter(MenuItem::getEnabled)
                     .map(menuMapper::toMenuItemDto)
                     .toList();
 
@@ -60,6 +61,7 @@ public class MenuItemService {
             Long restaurantId) {
         return itemRepo.findByRestaurantId(restaurantId)
                 .stream()
+                .filter(MenuItem::getEnabled)
                 .map(menuMapper::toMenuItemDto)
                 .toList();
     }
