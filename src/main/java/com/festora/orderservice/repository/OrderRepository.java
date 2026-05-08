@@ -29,4 +29,8 @@ public interface OrderRepository extends MongoRepository<Order, String> {
     List<Order> findOrdersByRestaurantIdAndTableNumberAndUserIdOrDeviceId(Long restaurantId, Integer tableNumber, String userId, String deviceId);
 
     List<Order> findByRestaurantIdAndCreatedAtBetween(Long restaurantId, long start, long end);
+
+    List<Order> findByRestaurantIdAndStatus(Long restaurantId, OrderStatus status);
+    List<Order> findByRestaurantIdAndTableNumberAndStatus(Long restaurantId, Integer tableNumber, OrderStatus status);
+    List<Order> findByRestaurantIdAndTableNumberAndUserIdAndStatus(Long restaurantId, Integer tableNumber, String userId, OrderStatus status);
 }

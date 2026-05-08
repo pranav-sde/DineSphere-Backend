@@ -221,6 +221,7 @@ public class OrderService {
                 .orderId(generateOrderId())
                 .restaurantId(req.getRestaurantId())
                 .userId(req.getUserId())
+                .userName(req.getUserName())
                 .deviceId(req.getDeviceId())
                 .tableNumber(req.getTableNumber())
                 .items(resolvedItems)

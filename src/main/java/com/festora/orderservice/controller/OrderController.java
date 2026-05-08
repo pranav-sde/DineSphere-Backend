@@ -5,6 +5,7 @@ import com.festora.orderservice.dto.OrderCreateResponse;
 import com.festora.orderservice.model.Order;
 import com.festora.orderservice.model.OrderItem;
 import com.festora.orderservice.service.OrderService;
+import com.festora.orderservice.service.BillService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
@@ -20,6 +21,7 @@ import java.util.List;
 public class OrderController {
 
     private final OrderService orderService;
+    private final BillService billService;
 
     @GetMapping("/health")
     public ResponseEntity<String> health() {
@@ -37,6 +39,23 @@ public class OrderController {
             return new ResponseEntity<>(orderService.getAllOrdersForTableByRestaurantId(restaurantId, tableNumber, userId, deviceId), HttpStatus.OK);
         } catch (Exception e){
             return new ResponseEntity<>(HttpStatus.BAD_REQUEST);
+        }
+    }
+
+    @GetMapping("/my/bill")
+    public ResponseEntity<com.festora.orderservice.model.UserBill> getMyBill(
+            @RequestHeader("X-Restaurant-Id") Long restaurantId,
+            @RequestHeader("X-User-Id") String userId
+    ) {
+        try {
+            com.festora.orderservice.model.UserBill bill = 
+                    billService.getMyLatestBill(userId, restaurantId);
+            if (bill == null) {
+                return ResponseEntity.notFound().build();
+            }
+            return ResponseEntity.ok(bill);
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().build();
         }
     }
 

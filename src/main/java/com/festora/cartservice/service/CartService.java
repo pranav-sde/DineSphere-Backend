@@ -253,6 +253,7 @@ public class CartService {
         orderRequest.setRestaurantId(cart.getRestaurantId());
         orderRequest.setTableNumber(req.getTableNumber());
         orderRequest.setUserId(cart.getUserId());
+        orderRequest.setUserName(req.getUserName());
         orderRequest.setDeviceId(req.getDeviceId());
         orderRequest.setSubtotal(cart.getSubtotal());
         orderRequest.setItems(

@@ -12,5 +12,6 @@ public class CheckoutRequest {
     private Long restaurantId;
     private Integer tableNumber;
     private String userId;
+    private String userName;
     private String deviceId;
 }

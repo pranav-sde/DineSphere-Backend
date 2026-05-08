@@ -1,6 +1,6 @@
 package com.festora.orderservice.model;
 
-import com.festora.orderservice.enums.OrderStatus;
+import com.festora.orderservice.enums.BillingStatus;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -15,41 +15,37 @@ import java.util.List;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-@Document(collection = "orders")
-public class Order {
+@Document(collection = "user_bills")
+public class UserBill {
 
     @Id
-    private String id; // Internal MongoDB ID
+    private String id;
 
     @Indexed(unique = true)
-    private String orderId; // Business Order ID (UUID)
+    private String billId;
 
     @Indexed
     private Long restaurantId;
+    
+    @Indexed
+    private int tableNumber;
+    
     private String userId;
     private String userName;
-    private String deviceId;
-    private int tableNumber;
+
+    private List<String> orderIds;
 
     private List<OrderItem> items;
 
     private double baseAmount;
     private double cgstAmount;
     private double sgstAmount;
-    private double gstAmount;   // cgst + sgst
+    private double gstAmount;
     private double discountAmount;
     private double totalAmount;
 
-    private String inventoryReservationId;
-    private long inventoryExpiresAt;
+    private BillingStatus status;
 
-    private String reason;
-
-    private String billId;
-    // State
-    private OrderStatus status;
-
-    // Timestamps
     private long createdAt;
     private long updatedAt;
 }

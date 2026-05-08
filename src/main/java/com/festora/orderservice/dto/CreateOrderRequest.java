@@ -11,6 +11,7 @@ public class CreateOrderRequest {
     private String orderId;
     private Long restaurantId;
     private String userId;
+    private String userName;
     private String deviceId;
     private int tableNumber;
     private List<OrderItem> items;
