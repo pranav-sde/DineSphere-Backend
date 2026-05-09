@@ -13,12 +13,15 @@ import org.springframework.stereotype.Service;
 public class EmailService {
 
     private final JavaMailSender mailSender;
+    
+    @org.springframework.beans.factory.annotation.Value("${spring.mail.username}")
+    private String fromEmail;
 
     @Async
     public void sendOtpEmail(String to, String otp) {
         try {
             SimpleMailMessage message = new SimpleMailMessage();
-            message.setFrom("DineSphere <noreply@festora.com>");
+            message.setFrom("DineSphere <" + fromEmail + ">");
             message.setTo(to);
             message.setSubject("DineSphere - Your Verification Code");
             message.setText("Welcome to DineSphere Elite Network!\n\n" +
@@ -29,7 +32,7 @@ public class EmailService {
             mailSender.send(message);
             log.info("OTP email sent successfully to {}", to);
         } catch (Exception e) {
-            log.error("Failed to send OTP email to {}: {}", to, e.getMessage());
+            log.error("CRITICAL: Failed to send OTP email to {}. Reason: {}. Please check SMTP configuration and network connectivity.", to, e.getMessage());
         }
     }
 }
