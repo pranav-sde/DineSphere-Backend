@@ -78,6 +78,22 @@ public class RedisUtils {
         redisTemplate.delete(key);
     }
 
+    /**
+     * Simple Put: Stores a plain string (No compression).
+     * Best for short-lived codes like OTPs.
+     */
+    public void put(String key, String value, long ttl, TimeUnit unit) {
+        redisTemplate.opsForValue().set(key, value, ttl, unit);
+    }
+
+    /**
+     * Simple Get: Retrieves a plain string.
+     */
+    public String get(String key) {
+        Object val = redisTemplate.opsForValue().get(key);
+        return val != null ? val.toString() : null;
+    }
+
     private byte[] compress(String str) throws IOException {
         if (str == null || str.isEmpty()) return null;
         ByteArrayOutputStream out = new ByteArrayOutputStream();

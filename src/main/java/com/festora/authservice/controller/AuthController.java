@@ -2,7 +2,7 @@ package com.festora.authservice.controller;
 
 import com.festora.authservice.dto.*;
 import com.festora.authservice.service.AdminUserService;
-import com.festora.authservice.service.AuthService;
+import com.festora.authservice.service.*;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.*;
 
@@ -12,10 +12,33 @@ public class AuthController {
 
     private final AuthService authService;
     private final AdminUserService adminUserService;
+    private final OtpService otpService;
 
-    public AuthController(AuthService authService, AdminUserService adminUserService) {
+    public AuthController(AuthService authService, AdminUserService adminUserService, OtpService otpService) {
         this.authService = authService;
         this.adminUserService = adminUserService;
+        this.otpService = otpService;
+    }
+
+    @PostMapping("/send-otp")
+    public void sendOtp(@RequestBody java.util.Map<String, String> req) {
+        String email = req.get("email");
+        if (email == null || email.isEmpty()) {
+            throw new RuntimeException("Email is required");
+        }
+        otpService.generateAndSendOtp(email);
+    }
+
+    @PostMapping("/verify-otp")
+    public org.springframework.http.ResponseEntity<String> verifyOtp(@RequestBody java.util.Map<String, String> req) {
+        String email = req.get("email");
+        String otp = req.get("otp");
+        
+        if (otpService.verifyOtp(email, otp)) {
+            return org.springframework.http.ResponseEntity.ok("Email verified successfully");
+        } else {
+            return org.springframework.http.ResponseEntity.status(org.springframework.http.HttpStatus.BAD_REQUEST).body("Invalid or expired OTP");
+        }
     }
 
     @GetMapping("/health")

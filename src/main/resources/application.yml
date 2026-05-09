@@ -16,6 +16,18 @@ spring:
           max-active: 20
           max-idle: 10
           min-idle: 2
+  
+  mail:
+    host: ${MAIL_HOST:smtp.gmail.com}
+    port: ${MAIL_PORT:587}
+    username: ${MAIL_USERNAME:restrofoodiescanner@gmail.com}
+    password: ${MAIL_PASSWORD:xbmr dxms yecl jdys}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
 
 # Auth Service Configs
 app:
