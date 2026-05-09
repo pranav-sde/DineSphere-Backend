@@ -13,6 +13,8 @@ import org.springframework.cache.CacheManager;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -39,7 +41,6 @@ public class InventoryService {
     /**
      * Temp reserve: evicts inventory cache because reserved qty changes.
      */
-    @CacheEvict(value = "ownerInventory", key = "#request.restaurantId")
     public InventoryReservationEvent tempReserve(InventoryReserveRequest request) {
 
         validateRequest(request);
@@ -148,13 +149,16 @@ public class InventoryService {
             reservationItemRepo.save(ri);
         }
 
-        return InventoryReservationEvent.builder()
+        InventoryReservationEvent event = InventoryReservationEvent.builder()
                 .orderId(orderId)
                 .reservationId(reservationId)
                 .restaurantId(request.getRestaurantId())
                 .status(ReservationStatus.TEMP_RESERVED.name())
                 .expiresAt(expiresAt)
                 .build();
+
+        evictCache(request.getRestaurantId());
+        return event;
     }
 
     /**
@@ -227,7 +231,7 @@ public class InventoryService {
      * WHY: Each call does findAllByRestaurantId + N stock lookups = N+1 DB queries.
      * The admin dashboard polls this frequently. With 15s TTL, most polls are cache hits.
      */
-    @Cacheable(value = "ownerInventory", key = "#restaurantId")
+    @Cacheable(value = "ownerInventory", key = "#restaurantId", sync = true)
     public List<OwnerInventoryResponse> getInventory(Long restaurantId) {
         log.info("Cache MISS: fetching inventory from DB for restaurant {}", restaurantId);
         
@@ -267,7 +271,6 @@ public class InventoryService {
     }
 
     @Transactional
-    @CacheEvict(value = "ownerInventory", key = "#restaurantId")
     public void bulkUpsertStock(BulkUpdateStockRequest req, Long restaurantId) {
         if (req.getItems() == null || req.getItems().isEmpty()) {
             throw new IllegalArgumentException("Items list cannot be empty");
@@ -374,6 +377,7 @@ public class InventoryService {
         }
 
         log.info("Bulk upsert finished: {} total saved ({} updates, {} inserts)", savedItems.size(), updateCount, insertCount);
+        evictCache(restaurantId);
     }
 
     public void toggleInventory(ToggleInventoryRequest req) {
@@ -497,7 +501,26 @@ public class InventoryService {
     }
 
     private void evictCache(Long restaurantId) {
-        if (restaurantId != null && cacheManager.getCache("ownerInventory") != null) {
+        if (restaurantId == null) return;
+
+        // If we are in a transaction, wait until it commits before evicting.
+        // This prevents a race condition where another thread fetches OLD data from the DB
+        // because the current update hasn't committed yet.
+        if (TransactionSynchronizationManager.isActualTransactionActive()) {
+            log.debug("Registering post-commit cache eviction for restaurant {}", restaurantId);
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    performActualEvict(restaurantId);
+                }
+            });
+        } else {
+            performActualEvict(restaurantId);
+        }
+    }
+
+    private void performActualEvict(Long restaurantId) {
+        if (cacheManager.getCache("ownerInventory") != null) {
             cacheManager.getCache("ownerInventory").evict(restaurantId);
             log.info("Evicted ownerInventory cache for restaurant {}", restaurantId);
         }
