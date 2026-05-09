@@ -84,10 +84,12 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     }
 
     private boolean isPublicPath(String path) {
-        return path.startsWith("/auth/") ||
-               path.startsWith("/menu/") ||
+        return path.equals("/auth/login") ||
+               path.equals("/auth/signup") ||
+               path.equals("/auth/refresh") ||
+               path.startsWith("/auth/session/") ||
                path.endsWith("/health") ||
-               path.startsWith("/actuator/");
+               path.startsWith("/api/system/maintenance/");
     }
 
     private static class HeaderMapRequestWrapper extends jakarta.servlet.http.HttpServletRequestWrapper {

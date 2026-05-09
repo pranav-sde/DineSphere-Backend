@@ -26,6 +26,8 @@ app:
     secret: ${APP_SESSION_SECRET:mysupersecuresecretkey1234567890!!!}
     ttl-seconds: 21600
     token-ttl-seconds: 1800
+  maintenance:
+    secret: ${MAINTENANCE_SECRET:secure-maintenance-key-123}
 
 jwt:
   issuer: festora-auth

@@ -14,14 +14,6 @@ import org.springframework.security.web.SecurityFilterChain;
 @EnableWebSecurity
 public class SecurityConfig {
 
-    private static final String[] WHITELIST = {
-            "/auth/**",
-            "/menu/**",
-            "/cart/health",
-            "/order/health",
-            "/inventory/health",
-            "/actuator/**"
-    };
 
     @Bean
     public SecurityFilterChain securityFilterChain(
@@ -58,7 +50,8 @@ public class SecurityConfig {
                 )
 
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers(WHITELIST).permitAll()
+                        .requestMatchers("/auth/login", "/auth/signup", "/auth/refresh", "/auth/health", "/auth/session/**").permitAll()
+                        .requestMatchers("/cart/health", "/order/health", "/inventory/health", "/api/system/maintenance/**").permitAll()
                         .requestMatchers(org.springframework.http.HttpMethod.OPTIONS, "/**").permitAll()
                         .anyRequest().authenticated()
                 )

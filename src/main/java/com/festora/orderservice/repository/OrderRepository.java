@@ -18,6 +18,8 @@ public interface OrderRepository extends MongoRepository<Order, String> {
             long cutoffTime
     );
 
+    void deleteByStatusIn(List<OrderStatus> statuses);
+
     List<Order> findOrdersByStatus(OrderStatus status);
 
     Order findByOrderId(String orderId);
