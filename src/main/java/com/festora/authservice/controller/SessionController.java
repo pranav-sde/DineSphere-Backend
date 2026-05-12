@@ -15,7 +15,7 @@ import org.springframework.http.HttpStatus;
 
 @RestController
 @RequestMapping("/auth/session")
-@RequiredArgsConstructor
+@RequiredArgsConstructorSec
 public class SessionController {
 
     private final CustomerSessionService sessionService;

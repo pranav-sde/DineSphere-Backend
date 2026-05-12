@@ -9,7 +9,7 @@ spring:
     mongodb:
       uri: ${MONGODB_URI1:mongodb+srv://restrofoodiescanner_db_user:p6g4IAduGwk2t5To@pranav001.8l3iyj8.mongodb.net/food_qr_db?retryWrites=true&w=majority&maxPoolSize=50}
     redis:
-      url: ${REDIS_UEL1:rediss://default:gQAAAAAAAZfLAAIgcDI2MTQ3MzIwZjdlZWQ0MWM5OGMxZjdkODUzYzQ1N2EwMg@singular-albacore-104395.upstash.io:6379}
+      url: ${REDIS_URL:rediss://default:gQAAAAAAAZfLAAIgcDI2MTQ3MzIwZjdlZWQ0MWM5OGMxZjdkODUzYzQ1N2EwMg@singular-albacore-104395.upstash.io:6379}
       timeout: 50s
       jedis:
         pool:
