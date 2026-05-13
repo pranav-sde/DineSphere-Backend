@@ -4,6 +4,7 @@ import com.festora.authservice.model.QrTableMapping;
 import com.festora.authservice.repository.QrTableMappingRepository;
 import lombok.RequiredArgsConstructor;
 import org.apache.commons.lang3.StringUtils;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.util.ObjectUtils;
 
@@ -19,9 +20,8 @@ import java.util.UUID;
 public class OwnerService {
 
     private final QrTableMappingRepository qrTableMappingRepository;
-
-    private static final String FRONTEND_QR_URL =
-            "https://qr-scanserve.vercel.app/qr?qrId="; // move to application.yml later
+    @Value("${app.frontend.url}")
+    private String FRONTEND_QR_URL;
 
     public String getOrCreateMapping(Long restaurantId, Integer tableNumber) {
 

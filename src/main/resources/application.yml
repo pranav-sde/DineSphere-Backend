@@ -10,28 +10,22 @@ spring:
     mongodb:
       uri: ${MONGODB_URI1:mongodb+srv://restrofoodiescanner_db_user:p6g4IAduGwk2t5To@pranav001.8l3iyj8.mongodb.net/food_qr_db?retryWrites=true&w=majority&maxPoolSize=50}
     redis:
-      url: ${REDIS_UEL1:rediss://default:gQAAAAAAAZfLAAIgcDI2MTQ3MzIwZjdlZWQ0MWM5OGMxZjdkODUzYzQ1N2EwMg@singular-albacore-104395.upstash.io:6379}
+      url: ${REDIS_URL:rediss://default:gQAAAAAAAZfLAAIgcDI2MTQ3MzIwZjdlZWQ0MWM5OGMxZjdkODUzYzQ1N2EwMg@singular-albacore-104395.upstash.io:6379}
       timeout: 50s
       jedis:
         pool:
           max-active: 20
           max-idle: 10
           min-idle: 2
-  
-  mail:
-    host: ${MAIL_HOST:smtp.gmail.com}
-    port: ${MAIL_PORT:587}
-    username: ${MAIL_USERNAME:restrofoodiescanner@gmail.com}
-    password: ${MAIL_PASSWORD:xbmr dxms yecl jdys}
-    properties:
-      mail:
-        smtp:
-          auth: true
-          starttls:
-            enable: true
+
+resend:
+  api-key: ${RESEND_API_KEY:your-resend-api-key-here}
 
 # Auth Service Configs
 app:
+  frontend :
+    url : ${CUSTOMER_FRONTEND_URL:https://qr.dinesphere.co/qr?qrId=}
+
   qr:
     secret: ${APP_QR_SECRET:TnsLD53NKeFsHhZ73ojREN9XLT8dIuuvmeSh/f3FU2KF7q4m11nf/PJivEuplO9U4tZDUW0JPPByW2VHOU2HMQ==}
     token_ttl_seconds: 600
