@@ -23,7 +23,7 @@ resend:
 # Auth Service Configs
 app:
   frontend :
-    url : ${CUSTOMER_FRONTEND_URL}
+    url : ${CUSTOMER_FRONTEND_URL:https://qr.dinesphere.co/qr?qrId=}
 
   qr:
     secret: ${APP_QR_SECRET:TnsLD53NKeFsHhZ73ojREN9XLT8dIuuvmeSh/f3FU2KF7q4m11nf/PJivEuplO9U4tZDUW0JPPByW2VHOU2HMQ==}
