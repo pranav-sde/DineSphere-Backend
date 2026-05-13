@@ -91,6 +91,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                path.equals("/auth/verify-otp") ||
                path.startsWith("/auth/session/") ||
                path.endsWith("/health") ||
+               path.startsWith("/ws/") ||
                path.startsWith("/api/system/maintenance/");
     }
 

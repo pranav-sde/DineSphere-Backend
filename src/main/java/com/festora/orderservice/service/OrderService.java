@@ -13,6 +13,7 @@ import com.festora.orderservice.repository.OrderRepository;
 import com.festora.authservice.repository.QrTableMappingRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.util.CollectionUtils;
@@ -33,6 +34,20 @@ public class OrderService {
     private final GstCalculator gstCalculator;
     private final MenuClient menuClient;
     private final QrTableMappingRepository qrTableMappingRepository;
+    private final SimpMessagingTemplate messagingTemplate;
+
+    private Order saveAndBroadcast(Order order) {
+        Order savedOrder = orderRepository.save(order);
+        try {
+            // Broadcast to specific order topic
+            messagingTemplate.convertAndSend("/topic/orders/" + savedOrder.getOrderId(), savedOrder);
+            // Broadcast to restaurant orders topic
+            messagingTemplate.convertAndSend("/topic/restaurant/" + savedOrder.getRestaurantId() + "/orders", savedOrder);
+        } catch (Exception e) {
+            log.error("Failed to broadcast order update: {}", e.getMessage());
+        }
+        return savedOrder;
+    }
 
     public Order createOrder(CreateOrderRequest req) throws Exception {
         if (ObjectUtils.isEmpty(req)) {
@@ -48,11 +63,11 @@ public class OrderService {
             order.setStatus(OrderStatus.REJECTED);
             log.error("Inventory reservation failed for order {}: {}", order.getOrderId(), e.getMessage());
             order.setUpdatedAt(now());
-            orderRepository.save(order);
+            saveAndBroadcast(order);
             throw new IllegalStateException(e.getMessage());
         }
         order.setUpdatedAt(now());
-        return orderRepository.save(order);
+        return saveAndBroadcast(order);
     }
 
     /* ===============================
@@ -78,7 +93,7 @@ public class OrderService {
         recalcTotals(order);
         order.setUpdatedAt(now());
 
-        return orderRepository.save(order);
+        return saveAndBroadcast(order);
     }
 
     public void markServed(String orderId) {
@@ -114,7 +129,7 @@ public class OrderService {
 
         order.setStatus(OrderStatus.PAID);
         order.setUpdatedAt(now());
-        orderRepository.save(order);
+        saveAndBroadcast(order);
     }
 
     /* ===============================
@@ -140,7 +155,7 @@ public class OrderService {
         order.setStatus(OrderStatus.CANCELLED);
         order.setReason(reason);
         order.setUpdatedAt(now());
-        orderRepository.save(order);
+        saveAndBroadcast(order);
 
         inventoryClient.release(orderId);
     }
@@ -172,7 +187,7 @@ public class OrderService {
 
         order.setStatus(to);
         order.setUpdatedAt(now());
-        orderRepository.save(order);
+        saveAndBroadcast(order);
     }
 
     /* ===============================
@@ -297,7 +312,7 @@ public class OrderService {
 
             if ("TEMP_RESERVED".equalsIgnoreCase(status)) {
                 order.setUpdatedAt(now());
-                orderRepository.save(order);
+                saveAndBroadcast(order);
                 return;
             }
 
@@ -305,7 +320,7 @@ public class OrderService {
 
             order.setStatus(OrderStatus.REJECTED);
             order.setUpdatedAt(now());
-            orderRepository.save(order);
+            saveAndBroadcast(order);
 
         } catch (Exception e) {
             log.error("Inventory TEMP reserve handling failed for {}", request, e);
@@ -333,7 +348,7 @@ public class OrderService {
         // update status
         order.setStatus(OrderStatus.PREPARING);
         order.setUpdatedAt(now());
-        return orderRepository.save(order);
+        return saveAndBroadcast(order);
     }
 
     public Order updateOrderItems(String orderId, UpdateOrderItemsRequest request) {
@@ -360,7 +375,7 @@ public class OrderService {
         recalcTotals(order);
         order.setUpdatedAt(now());
 
-        return orderRepository.save(order);
+        return saveAndBroadcast(order);
     }
 
     private List<OrderItem> resolveItemsAllowNew(
@@ -463,7 +478,7 @@ public class OrderService {
         order.setStatus(OrderStatus.PREPARING);
         order.setUpdatedAt(now());
 
-        return orderRepository.save(order);
+        return saveAndBroadcast(order);
     }
 
     public List<Order> getActiveOwnerOrders(Long restaurantId) {

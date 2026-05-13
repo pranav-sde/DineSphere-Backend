@@ -11,6 +11,7 @@ import com.festora.orderservice.repository.OrderRepository;
 import com.festora.orderservice.repository.UserBillRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 
 import java.util.*;
@@ -24,6 +25,16 @@ public class BillService {
     private final OrderRepository orderRepository;
     private final UserBillRepository userBillRepository;
     private final GstCalculator gstCalculator;
+    private final SimpMessagingTemplate messagingTemplate;
+
+    private void broadcastOrderUpdate(Order order) {
+        try {
+            messagingTemplate.convertAndSend("/topic/orders/" + order.getOrderId(), order);
+            messagingTemplate.convertAndSend("/topic/restaurant/" + order.getRestaurantId() + "/orders", order);
+        } catch (Exception e) {
+            log.error("Failed to broadcast order update in BillService: {}", e.getMessage());
+        }
+    }
 
     public List<ActiveTableBillingSummary> getActiveTableBillingSummary(Long restaurantId) {
         // Only fetch PAYMENT_PENDING orders for unbilled summary
@@ -152,6 +163,7 @@ public class BillService {
             order.setBillId(savedBill.getBillId());
             order.setUpdatedAt(System.currentTimeMillis());
             orderRepository.save(order);
+            broadcastOrderUpdate(order);
         }
 
         return savedBill;
@@ -177,6 +189,7 @@ public class BillService {
                 order.setStatus(OrderStatus.PAID);
                 order.setUpdatedAt(System.currentTimeMillis());
                 orderRepository.save(order);
+                broadcastOrderUpdate(order);
             }
         }
 
@@ -198,6 +211,7 @@ public class BillService {
             order.setStatus(OrderStatus.CLOSED);
             order.setUpdatedAt(System.currentTimeMillis());
             orderRepository.save(order);
+            broadcastOrderUpdate(order);
         }
     }
 
