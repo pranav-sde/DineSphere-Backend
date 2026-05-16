@@ -18,10 +18,22 @@ spring:
           max-idle: 10
           min-idle: 2
 
-resend:
-  api-key: ${RESEND_API_KEY:your-resend-api-key-here}
+  mail:
+    host: smtp.gmail.com
+    port: 587
+    username: restrofoodiescanner@gmail.com
+    password: ${MAIL_PASSWORD:timq oecf lcnu hfro}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+            required: true
 
-# Auth Service Configs
+resend:
+  from-email: restrofoodiescanner@gmail.com
+
 app:
   frontend :
     url : ${CUSTOMER_FRONTEND_URL:https://qr.dinesphere.co/qr?qrId=}
