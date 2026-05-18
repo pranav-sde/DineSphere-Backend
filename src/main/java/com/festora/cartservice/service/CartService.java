@@ -7,6 +7,8 @@ import com.festora.cartservice.model.Cart;
 import com.festora.cartservice.model.CartItem;
 import com.festora.cartservice.repository.CartRepository;
 import com.festora.orderservice.dto.CreateOrderRequest;
+import com.festora.orderservice.dto.GstResult;
+import com.festora.orderservice.gst.GstCalculator;
 import com.festora.orderservice.model.Order;
 import com.festora.orderservice.model.OrderItem;
 import com.festora.orderservice.service.OrderService;
@@ -32,6 +34,7 @@ public class CartService {
     private final MenuLocalValidator menuValidator;
     private final OrderService orderService;
     private final Executor cartExecutor;
+    private final GstCalculator gstCalculator;
 
     public Cart addItem(AddToCartRequest cartReq) {
 
@@ -136,11 +139,37 @@ public class CartService {
     }
 
     private void recalcSubtotal(Cart cart) {
-        cart.setSubtotal(
-                cart.getItems().stream()
-                        .mapToDouble(CartItem::getTotalPrice)
-                        .sum()
-        );
+        double subtotal = 0.0;
+        for (CartItem item : cart.getItems()) {
+            double itemTotal = item.getUnitPrice() * item.getQuantity();
+            item.setTotalPrice(itemTotal);
+            
+            // Calculate safe GST for each item
+            GstResult itemGst = getSafeGst(cart.getRestaurantId(), itemTotal);
+            item.setGstPrice(itemGst.getTotalTax());
+            
+            subtotal += itemTotal;
+        }
+        
+        cart.setSubtotal(subtotal);
+        
+        // Calculate safe GST for the entire cart based on subtotal
+        GstResult cartGst = getSafeGst(cart.getRestaurantId(), subtotal);
+        cart.setGstPrice(cartGst.getTotalTax());
+    }
+
+    private GstResult getSafeGst(Long restaurantId, double amount) {
+        try {
+            return gstCalculator.calculate(restaurantId, amount);
+        } catch (Exception e) {
+            log.warn("Failed to calculate GST for restaurantId {}: {}", restaurantId, e.getMessage());
+            return GstResult.builder()
+                    .cgst(0)
+                    .sgst(0)
+                    .igst(0)
+                    .totalTax(0)
+                    .build();
+        }
     }
 
     private String buildIdentity(
