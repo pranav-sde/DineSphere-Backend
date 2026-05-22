@@ -1,8 +1,8 @@
 package com.festora.authservice.customer.validator;
 
 import com.festora.authservice.customer.dto.SessionData;
-import com.festora.authservice.model.CustomerSession;
 import com.festora.authservice.repository.CustomerSessionRepository;
+import com.festora.orderservice.enums.SeatingType;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
@@ -20,7 +20,10 @@ public class SessionStore {
                 .map(session -> new SessionData(
                         session.getSessionId(),
                         session.getRestaurantId(),
-                        session.getTableNumber()
+                        session.getTableNumber(),
+                        session.getSeatingType() != null
+                                ? session.getSeatingType().name()
+                                : SeatingType.TABLE.name()
                 ))
                 .orElse(null);
     }

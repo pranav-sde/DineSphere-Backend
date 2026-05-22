@@ -1,6 +1,9 @@
 package com.festora.orderservice.model;
 
 import com.festora.orderservice.enums.BillingStatus;
+import com.festora.orderservice.enums.OrderSource;
+import com.festora.orderservice.enums.PaymentMode;
+import com.festora.orderservice.enums.SeatingType;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -29,6 +32,17 @@ public class UserBill {
     
     @Indexed
     private int tableNumber;
+
+    // Seating & source context
+    private SeatingType seatingType;
+    private OrderSource orderSource;
+
+    // Hotel-specific (null for dine-in)
+    private String hotelConfigId;
+    private String hotelName;
+    private String mobileNumber;
+    private String roomNumber;
+    private PaymentMode paymentMode;
     
     private String userId;
     private String userName;

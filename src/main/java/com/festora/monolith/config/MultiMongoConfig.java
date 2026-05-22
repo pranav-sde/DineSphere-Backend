@@ -99,4 +99,17 @@ public class MultiMongoConfig {
             return new MongoTemplate(new SimpleMongoClientDatabaseFactory(mongoClient, "cart_db"));
         }
     }
+
+    // --- Hotel Service Config ---
+    @Configuration
+    @EnableMongoRepositories(
+            basePackages = "com.festora.hotelservice.repository",
+            mongoTemplateRef = "hotelMongoTemplate"
+    )
+    public static class HotelMongoConfig {
+        @Bean
+        public MongoTemplate hotelMongoTemplate(MongoClient mongoClient) {
+            return new MongoTemplate(new SimpleMongoClientDatabaseFactory(mongoClient, "hotel_db"));
+        }
+    }
 }

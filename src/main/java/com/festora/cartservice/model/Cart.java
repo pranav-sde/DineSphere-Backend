@@ -1,5 +1,6 @@
 package com.festora.cartservice.model;
 
+import com.festora.orderservice.enums.SeatingType;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -17,15 +18,14 @@ import java.util.List;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-@CompoundIndexes({
-        @CompoundIndex(name = "cart_unique_idx", def = "{'restaurantId': 1, 'tableNumber': 1, 'userId': 1}", unique = true)
-})
+@CompoundIndexes({@CompoundIndex(name = "cart_unique_idx", def = "{'restaurantId': 1, 'tableNumber': 1, 'userId': 1, 'seatingType': 1}", unique = true)})
 public class Cart implements Serializable {
 
     @Id
     private String cartId;
     private Long restaurantId;
     private Integer tableNumber;
+    private SeatingType seatingType;  // TABLE, ROOM, HOTEL_ROOM
     private String userId;
 
     private long createdAt;

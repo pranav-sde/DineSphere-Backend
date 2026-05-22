@@ -7,6 +7,7 @@ import lombok.NoArgsConstructor;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.index.Indexed;
 import org.springframework.data.mongodb.core.mapping.Document;
+import com.festora.orderservice.enums.SeatingType;
 
 import java.util.Date;
 import java.util.Map;
@@ -29,6 +30,7 @@ public class CustomerSession {
 
     private Long restaurantId;
     private Integer tableNumber;
+    private SeatingType seatingType;  // TABLE or ROOM
 
     private Date expiryDate;
 

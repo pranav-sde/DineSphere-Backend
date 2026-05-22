@@ -50,6 +50,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             Object tableObj = claims.get("tableNumber");
             Integer tableNumber = (tableObj instanceof Number) ? ((Number) tableObj).intValue() : null;
             String deviceId = claims.get("deviceId", String.class);
+            String seatingType = claims.get("seatingType", String.class);
             String role = claims.get("role", String.class);
 
             // 3. Set Spring Security Authentication
@@ -66,6 +67,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             if (restaurantId != null) wrappedRequest.addHeader("X-Restaurant-Id", String.valueOf(restaurantId));
             if (tableNumber != null) wrappedRequest.addHeader("X-Table-No", String.valueOf(tableNumber));
             if (deviceId != null) wrappedRequest.addHeader("X-Device-Id", deviceId);
+            if (seatingType != null) wrappedRequest.addHeader("X-Seating-Type", seatingType);
 
             filterChain.doFilter(wrappedRequest, response);
 

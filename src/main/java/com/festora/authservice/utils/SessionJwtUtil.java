@@ -26,7 +26,8 @@ public class SessionJwtUtil {
             String sessionId,
             Long restaurantId,
             Integer table,
-            String deviceId
+            String deviceId,
+            String seatingType
     ) {
         long now = System.currentTimeMillis();
 
@@ -35,6 +36,7 @@ public class SessionJwtUtil {
                 .claim("restaurantId", restaurantId)
                 .claim("tableNumber", table)
                 .claim("deviceId", deviceId)
+                .claim("seatingType", seatingType)
                 .claim("type", "access")
                 .setIssuedAt(new Date(now))
                 .setExpiration(new Date(now + 1800_000)) // 30 minutes
@@ -46,7 +48,8 @@ public class SessionJwtUtil {
             String sessionId,
             Long restaurantId,
             Integer table,
-            String deviceId
+            String deviceId,
+            String seatingType
     ) {
         long now = System.currentTimeMillis();
 
@@ -55,6 +58,7 @@ public class SessionJwtUtil {
                 .claim("restaurantId", restaurantId)
                 .claim("tableNumber", table)
                 .claim("deviceId", deviceId)
+                .claim("seatingType", seatingType)
                 .claim("type", "refresh")
                 .setIssuedAt(new Date(now))
                 .setExpiration(new Date(now + 14400_000)) // 4 hours

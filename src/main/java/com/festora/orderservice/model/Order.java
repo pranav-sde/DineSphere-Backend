@@ -1,6 +1,9 @@
 package com.festora.orderservice.model;
 
+import com.festora.orderservice.enums.OrderSource;
 import com.festora.orderservice.enums.OrderStatus;
+import com.festora.orderservice.enums.PaymentMode;
+import com.festora.orderservice.enums.SeatingType;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -29,7 +32,24 @@ public class Order {
     private String userId;
     private String userName;
     private String deviceId;
-    private int tableNumber;
+    private Integer tableNumber;
+
+    // Seating & source context
+    @Builder.Default
+    private SeatingType seatingType = SeatingType.TABLE;
+    @Builder.Default
+    private OrderSource orderSource = OrderSource.DINE_IN;
+
+    // Hotel-specific fields (null for dine-in orders)
+    @Indexed
+    private String hotelConfigId;
+    private String hotelName;
+    private String mobileNumber;
+    private String roomNumber;                     // String to support "A-101", "S2" etc.
+
+    // Payment
+    @Builder.Default
+    private PaymentMode paymentMode = PaymentMode.ONLINE;
 
     private List<OrderItem> items;
 

@@ -9,4 +9,5 @@ public class SessionData {
     private String sessionId;
     private Long restaurantId;
     private Integer tableNumber;
+    private String seatingType;
 }

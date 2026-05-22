@@ -5,18 +5,22 @@ import com.festora.orderservice.client.MenuClient;
 import com.festora.orderservice.dto.*;
 import com.festora.orderservice.dto.event.InventoryConsumerEvent;
 import com.festora.orderservice.dto.event.OrderCancelledProducerEvent;
+import com.festora.orderservice.enums.OrderSource;
 import com.festora.orderservice.enums.OrderStatus;
+import com.festora.orderservice.enums.PaymentMode;
+import com.festora.orderservice.enums.SeatingType;
 import com.festora.orderservice.gst.GstCalculator;
 import com.festora.orderservice.model.Order;
 import com.festora.orderservice.model.OrderItem;
 import com.festora.orderservice.repository.OrderRepository;
 import com.festora.authservice.repository.QrTableMappingRepository;
+import com.festora.hotelservice.model.HotelConfig;
+import com.festora.hotelservice.repository.HotelConfigRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
-import org.springframework.util.CollectionUtils;
 import org.springframework.util.ObjectUtils;
 
 import java.time.LocalDate;
@@ -35,6 +39,7 @@ public class OrderService {
     private final MenuClient menuClient;
     private final QrTableMappingRepository qrTableMappingRepository;
     private final SimpMessagingTemplate messagingTemplate;
+    private final HotelConfigRepository hotelConfigRepository;
 
     private Order saveAndBroadcast(Order order) {
         Order savedOrder = orderRepository.save(order);
@@ -232,6 +237,17 @@ public class OrderService {
 
         GstResult gst = gstCalculator.calculate(req.getRestaurantId(), base);
 
+        String hotelName = null;
+        if (req.getHotelConfigId() != null && !req.getHotelConfigId().isBlank()) {
+            try {
+                hotelName = hotelConfigRepository.findById(req.getHotelConfigId())
+                        .map(HotelConfig::getHotelName)
+                        .orElse(null);
+            } catch (Exception e) {
+                log.warn("Failed to fetch hotel name for configId {}: {}", req.getHotelConfigId(), e.getMessage());
+            }
+        }
+
         return Order.builder()
                 .orderId(generateOrderId())
                 .restaurantId(req.getRestaurantId())
@@ -239,6 +255,22 @@ public class OrderService {
                 .userName(req.getUserName())
                 .deviceId(req.getDeviceId())
                 .tableNumber(req.getTableNumber())
+                // Seating & source context (defaults for backward compat)
+                .seatingType(req.getSeatingType() != null
+                        ? SeatingType.valueOf(req.getSeatingType())
+                        : SeatingType.TABLE)
+                .orderSource(req.getOrderSource() != null
+                        ? OrderSource.valueOf(req.getOrderSource())
+                        : OrderSource.DINE_IN)
+                // Hotel-specific (null for dine-in)
+                .hotelConfigId(req.getHotelConfigId())
+                .hotelName(hotelName)
+                .mobileNumber(req.getMobileNumber())
+                .roomNumber(req.getRoomNumber())
+                // Payment
+                .paymentMode(req.getPaymentMode() != null
+                        ? PaymentMode.valueOf(req.getPaymentMode())
+                        : PaymentMode.CASH_ON_DELIVERY)
                 .items(resolvedItems)
                 .baseAmount(base)
                 .cgstAmount(gst.getCgst())
@@ -516,15 +548,34 @@ public class OrderService {
     }
 
     public List<Order> getAllOrdersForTableByRestaurantId(Long restaurantId, Integer tableNumber, String userId, String deviceId) {
+        return getAllOrdersForTableByRestaurantId(restaurantId, tableNumber, userId, deviceId, false);
+    }
+
+    public List<Order> getAllOrdersForTableByRestaurantId(Long restaurantId, Integer tableNumber, String userId, String deviceId, boolean activeOnly) {
         if (restaurantId == null || tableNumber == null) {
             throw new IllegalArgumentException("Invalid restaurant or table number");
         }
         
+        List<Order> orders;
         if (deviceId != null && !deviceId.isBlank()) {
-            return orderRepository.findOrdersByRestaurantIdAndTableNumberAndUserIdOrDeviceId(restaurantId, tableNumber, userId, deviceId);
+            orders = orderRepository.findOrdersByRestaurantIdAndTableNumberAndUserIdOrDeviceId(restaurantId, tableNumber, userId, deviceId);
         } else {
-            return orderRepository.findOrdersByRestaurantIdAndTableNumberAndUserId(restaurantId, tableNumber, userId);
+            orders = orderRepository.findOrdersByRestaurantIdAndTableNumberAndUserId(restaurantId, tableNumber, userId);
         }
+
+        if (activeOnly) {
+            List<OrderStatus> activeStatuses = List.of(
+                    OrderStatus.CREATED,
+                    OrderStatus.PENDING,
+                    OrderStatus.PREPARING,
+                    OrderStatus.PAYMENT_PENDING,
+                    OrderStatus.PAYMENT_REQUESTED
+            );
+            return orders.stream()
+                    .filter(order -> activeStatuses.contains(order.getStatus()))
+                    .collect(Collectors.toList());
+        }
+        return orders;
     }
 
     public List<Order> fetchTodaysAllOrders(Long restaurantId) throws Exception {
@@ -544,7 +595,13 @@ public class OrderService {
 
     public DashboardSummaryResponse getDashboardSummary(Long restaurantId) throws Exception {
         List<Order> todayOrders = fetchTodaysAllOrders(restaurantId);
-        long totalTables = qrTableMappingRepository.countByRestaurantId(restaurantId);
+        long totalTables = qrTableMappingRepository.countByRestaurantIdAndSeatingType(restaurantId, SeatingType.TABLE);
+        long totalRooms = qrTableMappingRepository.countByRestaurantIdAndSeatingType(restaurantId, SeatingType.ROOM);
+
+        List<OrderStatus> activeStatuses = List.of(
+                OrderStatus.CREATED, OrderStatus.PENDING,
+                OrderStatus.PREPARING, OrderStatus.PAYMENT_PENDING
+        );
 
         double revenue = todayOrders.stream()
                 .filter(o -> o.getStatus() != OrderStatus.CANCELLED && o.getStatus() != OrderStatus.REJECTED)
@@ -552,9 +609,22 @@ public class OrderService {
                 .sum();
 
         long activeTablesCount = todayOrders.stream()
-                .filter(o -> List.of(OrderStatus.CREATED, OrderStatus.PENDING, OrderStatus.PREPARING, OrderStatus.PAYMENT_PENDING).contains(o.getStatus()))
+                .filter(o -> activeStatuses.contains(o.getStatus()))
+                .filter(o -> o.getSeatingType() != SeatingType.HOTEL_ROOM && o.getSeatingType() != SeatingType.ROOM)
                 .map(Order::getTableNumber)
                 .distinct()
+                .count();
+
+        long activeRoomsCount = todayOrders.stream()
+                .filter(o -> activeStatuses.contains(o.getStatus()))
+                .filter(o -> o.getSeatingType() == SeatingType.ROOM)
+                .map(Order::getTableNumber)
+                .distinct()
+                .count();
+
+        long activeHotelOrdersCount = todayOrders.stream()
+                .filter(o -> activeStatuses.contains(o.getStatus()))
+                .filter(o -> o.getOrderSource() == OrderSource.HOTEL_ROOM_SERVICE)
                 .count();
 
         List<Order> validOrders = todayOrders.stream()
@@ -567,7 +637,10 @@ public class OrderService {
                 .totalOrders(todayOrders.size())
                 .todayRevenue(revenue)
                 .activeTables((int) activeTablesCount)
+                .activeRooms((int) activeRoomsCount)
+                .activeHotelOrders((int) activeHotelOrdersCount)
                 .totalTables(totalTables)
+                .totalRooms(totalRooms)
                 .avgOrderValue(avgValue)
                 .build();
     }

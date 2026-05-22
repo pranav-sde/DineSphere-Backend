@@ -284,7 +284,11 @@ public class CartService {
         orderRequest.setUserId(cart.getUserId());
         orderRequest.setUserName(req.getUserName());
         orderRequest.setDeviceId(req.getDeviceId());
+        orderRequest.setSeatingType(req.getSeatingType() != null ? req.getSeatingType().name() : null);
         orderRequest.setSubtotal(cart.getSubtotal());
+        orderRequest.setHotelConfigId(req.getHotelConfigId());
+        orderRequest.setMobileNumber(req.getMobileNumber());
+        orderRequest.setRoomNumber(req.getRoomNumber());
         orderRequest.setItems(
                 cart.getItems().stream()
                         .map(item -> OrderItem.builder()
