@@ -1,6 +1,7 @@
 package com.festora.orderservice.repository;
 
 import com.festora.orderservice.enums.OrderStatus;
+import com.festora.orderservice.enums.SeatingType;
 import com.festora.orderservice.model.Order;
 import org.springframework.data.mongodb.repository.MongoRepository;
 import org.springframework.data.mongodb.repository.Query;
@@ -35,9 +36,15 @@ public interface OrderRepository extends MongoRepository<Order, String> {
     List<Order> findByRestaurantIdAndStatus(Long restaurantId, OrderStatus status);
     List<Order> findByRestaurantIdAndTableNumberAndStatus(Long restaurantId, Integer tableNumber, OrderStatus status);
     List<Order> findByRestaurantIdAndTableNumberAndUserIdAndStatus(Long restaurantId, Integer tableNumber, String userId, OrderStatus status);
+    List<Order> findByRestaurantIdAndTableNumberAndSeatingTypeAndStatus(Long restaurantId, Integer tableNumber, SeatingType seatingType, OrderStatus status);
+    List<Order> findByRestaurantIdAndTableNumberAndSeatingTypeAndUserIdAndStatus(Long restaurantId, Integer tableNumber, SeatingType seatingType, String userId, OrderStatus status);
 
     // Hotel room service queries
     List<Order> findByMobileNumberAndHotelConfigIdOrderByCreatedAtDesc(String mobileNumber, String hotelConfigId);
     List<Order> findByHotelConfigIdAndStatusIn(String hotelConfigId, List<OrderStatus> statuses);
     List<Order> findByRestaurantIdAndOrderSourceOrderByCreatedAtDesc(Long restaurantId, String orderSource);
+    List<Order> findByRestaurantIdAndHotelConfigIdAndRoomNumberAndStatus(Long restaurantId, String hotelConfigId, String roomNumber, OrderStatus status);
+    List<Order> findByRestaurantIdAndHotelConfigIdAndRoomNumberAndUserIdAndStatus(Long restaurantId, String hotelConfigId, String roomNumber, String userId, OrderStatus status);
+    List<Order> findByRestaurantIdAndHotelConfigIdAndStatus(Long restaurantId, String hotelConfigId, OrderStatus status);
+    List<Order> findByRestaurantIdAndHotelConfigIdAndRoomNumberAndStatusIn(Long restaurantId, String hotelConfigId, String roomNumber, List<OrderStatus> statuses);
 }
