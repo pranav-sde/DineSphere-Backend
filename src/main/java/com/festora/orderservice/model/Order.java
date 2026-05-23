@@ -46,6 +46,11 @@ public class Order {
     private String reason;
 
     private String billId;
+    
+    // Payment Details
+    private String paymentMethod;
+    private String razorpayPaymentId;
+    
     // State
     private OrderStatus status;
 

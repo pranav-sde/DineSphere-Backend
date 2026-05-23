@@ -89,7 +89,13 @@ public class OrderController {
     // ==================================================
     @PostMapping("/{orderId}/payment/success")
     public ResponseEntity<Void> paymentSuccess(@PathVariable String orderId) {
-        orderService.onPaymentSuccess(orderId);
+        orderService.onPaymentSuccess(orderId, null, null);
+        return ResponseEntity.ok().build();
+    }
+
+    @PostMapping("/{orderId}/payment-method/cod")
+    public ResponseEntity<Void> selectCOD(@PathVariable String orderId) {
+        orderService.selectCOD(orderId);
         return ResponseEntity.ok().build();
     }
 

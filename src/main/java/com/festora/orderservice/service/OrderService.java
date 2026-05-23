@@ -110,7 +110,7 @@ public class OrderService {
     /* ===============================
         5️⃣ PAYMENT SUCCESS (ONE ENTRY)
        =============================== */
-    public void onPaymentSuccess(String orderId) {
+    public void onPaymentSuccess(String orderId, String paymentMethod, String razorpayPaymentId) {
 
         Order order = get(orderId);
 
@@ -121,13 +121,42 @@ public class OrderService {
         }
 
         if (order.getStatus() != OrderStatus.PAYMENT_PENDING &&
-                order.getStatus() != OrderStatus.PAYMENT_REQUESTED) {
+                order.getStatus() != OrderStatus.PAYMENT_REQUESTED &&
+                order.getStatus() != OrderStatus.PENDING &&
+                order.getStatus() != OrderStatus.CREATED &&
+                order.getStatus() != OrderStatus.PREPARING) {
             throw new IllegalStateException("Invalid payment state");
         }
 
         inventoryClient.confirm(orderId);
 
-        order.setStatus(OrderStatus.PAID);
+        if (order.getStatus() == OrderStatus.PAYMENT_PENDING || 
+            order.getStatus() == OrderStatus.PAYMENT_REQUESTED) {
+            order.setStatus(OrderStatus.PAID);
+        }
+        
+        if (paymentMethod != null) {
+            order.setPaymentMethod(paymentMethod);
+        }
+        if (razorpayPaymentId != null) {
+            order.setRazorpayPaymentId(razorpayPaymentId);
+        }
+        order.setUpdatedAt(now());
+        saveAndBroadcast(order);
+    }
+
+    /* ===============================
+        COD SELECTION
+       =============================== */
+    public void selectCOD(String orderId) {
+        Order order = get(orderId);
+        
+        // Only allow selecting COD if order is not already paid or closed
+        if (order.getStatus() == OrderStatus.PAID || order.getStatus() == OrderStatus.CLOSED) {
+            throw new IllegalStateException("Cannot change payment method for paid or closed orders");
+        }
+        
+        order.setPaymentMethod("COD");
         order.setUpdatedAt(now());
         saveAndBroadcast(order);
     }

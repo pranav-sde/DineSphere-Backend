@@ -9,4 +9,5 @@ import java.util.Optional;
 @Repository
 public interface PaymentLedgerRepository extends MongoRepository<PaymentLedger, String> {
     Optional<PaymentLedger> findByOrderId(String orderId);
+    Optional<PaymentLedger> findByRazorpayOrderId(String razorpayOrderId);
 }
