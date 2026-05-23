@@ -2,7 +2,10 @@ package com.festora.orderservice.service;
 
 import com.festora.orderservice.dto.*;
 import com.festora.orderservice.enums.BillingStatus;
+import com.festora.orderservice.enums.OrderSource;
 import com.festora.orderservice.enums.OrderStatus;
+import com.festora.orderservice.enums.PaymentMode;
+import com.festora.orderservice.enums.SeatingType;
 import com.festora.orderservice.gst.GstCalculator;
 import com.festora.orderservice.model.Order;
 import com.festora.orderservice.model.OrderItem;
@@ -48,6 +51,7 @@ public class BillService {
             summaryMap.computeIfAbsent(order.getTableNumber(), table -> 
                 ActiveTableBillingSummary.builder()
                         .tableNumber(table)
+                        .seatingType(order.getSeatingType() != null ? order.getSeatingType() : SeatingType.TABLE)
                         .unbilledOrdersCount(0)
                         .activeBillsCount(0)
                         .totalUnpaidAmount(0)
@@ -64,6 +68,7 @@ public class BillService {
             summaryMap.computeIfAbsent(bill.getTableNumber(), table -> 
                 ActiveTableBillingSummary.builder()
                         .tableNumber(table)
+                        .seatingType(bill.getSeatingType() != null ? bill.getSeatingType() : SeatingType.TABLE)
                         .unbilledOrdersCount(0)
                         .activeBillsCount(0)
                         .totalUnpaidAmount(0)
@@ -138,10 +143,20 @@ public class BillService {
                 .findFirst()
                 .orElse("Guest");
 
+        // Derive bill context from first order (all orders in group share same context)
+        Order representative = unbilledOrders.get(0);
+
         UserBill bill = UserBill.builder()
                 .billId(generateBillId())
                 .restaurantId(restaurantId)
                 .tableNumber(tableNumber)
+                .seatingType(representative.getSeatingType() != null ? representative.getSeatingType() : SeatingType.TABLE)
+                .orderSource(representative.getOrderSource() != null ? representative.getOrderSource() : OrderSource.DINE_IN)
+                .hotelConfigId(representative.getHotelConfigId())
+                .hotelName(representative.getHotelName())
+                .mobileNumber(representative.getMobileNumber())
+                .roomNumber(representative.getRoomNumber())
+                .paymentMode(representative.getPaymentMode() != null ? representative.getPaymentMode() : PaymentMode.ONLINE)
                 .userId(userId)
                 .userName(userName)
                 .orderIds(orderIds)

@@ -18,23 +18,42 @@ public class OwnerController {
 
     private final OwnerService ownerService;
 
+    // ── Table QR (existing) ─────────────────────────────────────────────
+
     @GetMapping("/tables/bulk")
     public ResponseEntity<?> generateBulk(HttpServletRequest request, @RequestParam("start") Integer start, @RequestParam("end") Integer end) {
 
-        String restaurantIdStr = request.getHeader("X-Restaurant-Id");
-        Long restaurantId = restaurantIdStr != null ? Long.valueOf(restaurantIdStr) : null;
-
-        if (restaurantId == null) {
-            return ResponseEntity.status(401).build();
-        }
+        Long restaurantId = extractRestaurantId(request);
+        if (restaurantId == null) return ResponseEntity.status(401).build();
 
         try {
-            List<String> urls =
-                    ownerService.generateUrlsInBulk(restaurantId, start, end);
+            List<String> urls = ownerService.generateUrlsInBulk(restaurantId, start, end);
             return ResponseEntity.ok(urls);
-
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(e.getMessage());
         }
+    }
+
+    // ── Room QR (new) ───────────────────────────────────────────────────
+
+    @GetMapping("/rooms/bulk")
+    public ResponseEntity<?> generateRoomBulk(HttpServletRequest request, @RequestParam("start") Integer start, @RequestParam("end") Integer end) {
+
+        Long restaurantId = extractRestaurantId(request);
+        if (restaurantId == null) return ResponseEntity.status(401).build();
+
+        try {
+            List<String> urls = ownerService.generateRoomUrlsInBulk(restaurantId, start, end);
+            return ResponseEntity.ok(urls);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
+
+    // ── Shared helper ───────────────────────────────────────────────────
+
+    private Long extractRestaurantId(HttpServletRequest request) {
+        String restaurantIdStr = request.getHeader("X-Restaurant-Id");
+        return restaurantIdStr != null ? Long.valueOf(restaurantIdStr) : null;
     }
 }

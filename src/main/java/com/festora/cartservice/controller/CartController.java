@@ -94,7 +94,8 @@ public class CartController {
             @RequestHeader("X-Restaurant-Id") Long restaurantId,
             @RequestHeader("X-Table-No") Integer tableNumber,
             @RequestHeader("X-User-Id") String userId,
-            @RequestHeader(value = "X-Device-Id", required = false) String deviceId
+            @RequestHeader(value = "X-Device-Id", required = false) String deviceId,
+            @RequestHeader(value = "X-Seating-Type", required = false) String seatingType
     ) {
         // Force the secure values BEFORE checking out!
         request.setRestaurantId(restaurantId);
@@ -102,6 +103,13 @@ public class CartController {
         request.setDeviceId(deviceId);
         if (tableNumber != null) {
             request.setTableNumber(tableNumber);
+        }
+        if (seatingType != null && request.getSeatingType() == null) {
+            try {
+                request.setSeatingType(com.festora.orderservice.enums.SeatingType.valueOf(seatingType));
+            } catch (Exception e) {
+                // Ignore invalid values
+            }
         }
 
         try {

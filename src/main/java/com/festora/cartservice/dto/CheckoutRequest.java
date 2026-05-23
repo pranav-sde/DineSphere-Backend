@@ -1,6 +1,7 @@
 package com.festora.cartservice.dto;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.festora.orderservice.enums.SeatingType;
 import lombok.*;
 
 @Data
@@ -14,4 +15,8 @@ public class CheckoutRequest {
     private String userId;
     private String userName;
     private String deviceId;
+    private SeatingType seatingType;
+    private String mobileNumber;
+    private String roomNumber;
+    private String hotelConfigId;
 }

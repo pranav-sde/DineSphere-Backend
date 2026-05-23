@@ -7,6 +7,9 @@ import com.festora.authservice.model.QrTableMapping;
 import com.festora.authservice.repository.CustomerSessionRepository;
 import com.festora.authservice.repository.QrTableMappingRepository;
 import com.festora.authservice.utils.SessionJwtUtil;
+import com.festora.hotelservice.model.HotelConfig;
+import com.festora.hotelservice.repository.HotelConfigRepository;
+import com.festora.orderservice.enums.SeatingType;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -25,6 +28,7 @@ public class CustomerSessionService {
 
     private final QrTableMappingRepository qrRepo;
     private final CustomerSessionRepository sessionRepo;
+    private final HotelConfigRepository hotelConfigRepo;
     private final SessionJwtUtil sessionJwtUtil;
     private final com.festora.authservice.customer.validator.SessionTokenValidator tokenValidator;
 
@@ -40,55 +44,86 @@ public class CustomerSessionService {
             throw new IllegalArgumentException("qrId in body must be provided");
         }
 
-        // 1. Resolve restaurant and table information
-        QrTableMapping mapping = qrRepo.findByQrId(qrId)
-                .orElseThrow(() -> new IllegalArgumentException("Invalid or inactive QR code: " + qrId));
+        // 1. Resolve restaurant and table/hotel information
+        Optional<QrTableMapping> mappingOpt = qrRepo.findByQrId(qrId);
 
-        if (!Boolean.TRUE.equals(mapping.getActive())) {
-            throw new IllegalArgumentException("QR code is inactive: " + qrId);
-        }
-
-        Long restaurantId = mapping.getRestaurantId();
-        Integer tableNumber = mapping.getTableNumber();
-
-        // 2. Check for existing session for this device+table
-        Optional<CustomerSession> existingSession = sessionRepo.findByDeviceIdAndRestaurantIdAndTableNumber(
-                deviceId, restaurantId, tableNumber
-        );
-
-        if (existingSession.isPresent()) {
-            CustomerSession session = existingSession.get();
-            // Refresh expiry if not expired
-            if (session.getExpiryDate().after(new Date())) {
-                session.setExpiryDate(new Date(System.currentTimeMillis() + REFRESH_TTL_MILLIS));
-                sessionRepo.save(session);
-
-                return new SessionStartResponse( tableNumber,
-                        createToken(session.getSessionId(), restaurantId, tableNumber, deviceId),
-                        createRefreshToken(session.getSessionId(), restaurantId, tableNumber, deviceId),
-                        SESSION_TTL_MILLIS / 1000
-                );
-            } else {
-                sessionRepo.delete(session);
+        if (mappingOpt.isPresent()) {
+            QrTableMapping mapping = mappingOpt.get();
+            if (!Boolean.TRUE.equals(mapping.getActive())) {
+                throw new IllegalArgumentException("QR code is inactive: " + qrId);
             }
+
+            Long restaurantId = mapping.getRestaurantId();
+            Integer tableNumber = mapping.getTableNumber();
+            SeatingType seatingType = mapping.getSeatingType() != null ? mapping.getSeatingType() : SeatingType.TABLE;
+
+            // 2. Check for existing session for this device+table
+            Optional<CustomerSession> existingSession = sessionRepo.findByDeviceIdAndRestaurantIdAndTableNumber(
+                    deviceId, restaurantId, tableNumber
+            );
+
+            if (existingSession.isPresent()) {
+                CustomerSession session = existingSession.get();
+                // Refresh expiry if not expired
+                if (session.getExpiryDate().after(new Date())) {
+                    session.setExpiryDate(new Date(System.currentTimeMillis() + REFRESH_TTL_MILLIS));
+                    sessionRepo.save(session);
+
+                    return buildResponse(tableNumber, seatingType,
+                            session.getSessionId(), restaurantId, deviceId);
+                } else {
+                    sessionRepo.delete(session);
+                }
+            }
+
+            // 3. Create new session
+            String sessionId = UUID.randomUUID().toString();
+            CustomerSession session = CustomerSession.builder()
+                    .sessionId(sessionId)
+                    .deviceId(deviceId)
+                    .restaurantId(restaurantId)
+                    .tableNumber(tableNumber)
+                    .seatingType(seatingType)
+                    .expiryDate(new Date(System.currentTimeMillis() + REFRESH_TTL_MILLIS))
+                    .build();
+            sessionRepo.save(session);
+
+            return buildResponse(tableNumber, seatingType, sessionId, restaurantId, deviceId);
+        } else {
+            // Not in table mappings — check if it's a hotel config QR!
+            HotelConfig hotel = hotelConfigRepo.findByQrId(qrId)
+                    .orElseThrow(() -> new IllegalArgumentException("Invalid or inactive QR code: " + qrId));
+
+            if (!Boolean.TRUE.equals(hotel.getActive())) {
+                throw new IllegalArgumentException("This hotel is no longer active");
+            }
+
+            // Generate stateless session token (tableNumber = 0)
+            String sessionId = UUID.randomUUID().toString();
+            String token = sessionJwtUtil.createSessionToken(
+                    sessionId,
+                    hotel.getRestaurantId(),
+                    0,
+                    "hotel-" + hotel.getId(),
+                    "HOTEL_ROOM"
+            );
+            String refreshToken = sessionJwtUtil.createRefreshToken(
+                    sessionId,
+                    hotel.getRestaurantId(),
+                    0,
+                    "hotel-" + hotel.getId(),
+                    "HOTEL_ROOM"
+            );
+
+            return SessionStartResponse.builder()
+                    .tableNumber(0)
+                    .seatingType("HOTEL_ROOM")
+                    .sessionToken(token)
+                    .refreshToken(refreshToken)
+                    .expiresIn(4 * 60 * 60) // 4 hours in seconds
+                    .hotelConfigId(hotel.getId())
+                    .build();
         }
-
-        // 3. Create new session
-        String sessionId = UUID.randomUUID().toString();
-        CustomerSession session = CustomerSession.builder()
-                .sessionId(sessionId)
-                .deviceId(deviceId)
-                .restaurantId(restaurantId)
-                .tableNumber(tableNumber)
-                .expiryDate(new Date(System.currentTimeMillis() + REFRESH_TTL_MILLIS))
-                .build();
-        sessionRepo.save(session);
-
-        return new SessionStartResponse(tableNumber,
-                createToken(sessionId, restaurantId, tableNumber, deviceId),
-                createRefreshToken(sessionId, restaurantId, tableNumber, deviceId),
-                SESSION_TTL_MILLIS / 1000
-        );
     }
 
     public SessionStartResponse refreshSession(String refreshToken) {
@@ -103,6 +138,9 @@ public class CustomerSessionService {
             Long restaurantId = claims.get("restaurantId", Long.class);
             Integer tableNumber = claims.get("tableNumber", Integer.class);
             String deviceId = claims.get("deviceId", String.class);
+            SeatingType seatingType = claims.get("seatingType", String.class) != null
+                    ? SeatingType.valueOf(claims.get("seatingType", String.class))
+                    : SeatingType.TABLE;
 
             CustomerSession session = sessionRepo.findBySessionId(sessionId)
                     .orElseThrow(() -> new IllegalArgumentException("Session not found"));
@@ -116,32 +154,38 @@ public class CustomerSessionService {
             session.setExpiryDate(new Date(System.currentTimeMillis() + REFRESH_TTL_MILLIS));
             sessionRepo.save(session);
 
-            return new SessionStartResponse(
-                    tableNumber,
-                    createToken(sessionId, restaurantId, tableNumber, deviceId),
-                    createRefreshToken(sessionId, restaurantId, tableNumber, deviceId),
-                    SESSION_TTL_MILLIS / 1000
-            );
+            return buildResponse(tableNumber, seatingType, sessionId, restaurantId, deviceId);
         } catch (Exception e) {
             throw new IllegalArgumentException("Invalid refresh token", e);
         }
     }
 
-    private String createToken(String sessionId, Long restaurantId, Integer tableNumber, String deviceId) {
-        return sessionJwtUtil.createSessionToken(
-                sessionId,
-                restaurantId,
+    // ── Helper: builds a uniform response with tokens ──────────────────
+    private SessionStartResponse buildResponse(
+            Integer tableNumber, SeatingType seatingType,
+            String sessionId, Long restaurantId, String deviceId) {
+
+        return new SessionStartResponse(
                 tableNumber,
-                deviceId
+                seatingType.name(),
+                createToken(sessionId, restaurantId, tableNumber, deviceId, seatingType),
+                createRefreshToken(sessionId, restaurantId, tableNumber, deviceId, seatingType),
+                SESSION_TTL_MILLIS / 1000,
+                null
         );
     }
 
-    private String createRefreshToken(String sessionId, Long restaurantId, Integer tableNumber, String deviceId) {
+    private String createToken(String sessionId, Long restaurantId,
+                               Integer tableNumber, String deviceId, SeatingType seatingType) {
+        return sessionJwtUtil.createSessionToken(
+                sessionId, restaurantId, tableNumber, deviceId, seatingType.name()
+        );
+    }
+
+    private String createRefreshToken(String sessionId, Long restaurantId,
+                                      Integer tableNumber, String deviceId, SeatingType seatingType) {
         return sessionJwtUtil.createRefreshToken(
-                sessionId,
-                restaurantId,
-                tableNumber,
-                deviceId
+                sessionId, restaurantId, tableNumber, deviceId, seatingType.name()
         );
     }
 }

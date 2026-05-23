@@ -49,9 +49,13 @@ public class SessionValidationFilter extends OncePerRequestFilter {
                 uri.startsWith("/auth/logout") ||
                 uri.startsWith("/auth/session/start") ||
                 uri.startsWith("/auth/session/refresh") ||
+                uri.startsWith("/auth/session/hotel") ||   // Guest: hotel QR scan (public)
+                uri.startsWith("/order/hotel") ||          // Guest: hotel order create & lookup (public)
                 uri.startsWith("/menu/") ||
                 uri.startsWith("/actuator/") ||
                 uri.endsWith("/health")) {
+            // Note: /auth/hotel (hotel CRUD) and /auth/hotel/rooms are owner-only
+            // and protected by the Bearer token check above — no whitelist needed.
             filterChain.doFilter(request, response);
             return;
         }

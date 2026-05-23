@@ -35,4 +35,9 @@ public interface OrderRepository extends MongoRepository<Order, String> {
     List<Order> findByRestaurantIdAndStatus(Long restaurantId, OrderStatus status);
     List<Order> findByRestaurantIdAndTableNumberAndStatus(Long restaurantId, Integer tableNumber, OrderStatus status);
     List<Order> findByRestaurantIdAndTableNumberAndUserIdAndStatus(Long restaurantId, Integer tableNumber, String userId, OrderStatus status);
+
+    // Hotel room service queries
+    List<Order> findByMobileNumberAndHotelConfigIdOrderByCreatedAtDesc(String mobileNumber, String hotelConfigId);
+    List<Order> findByHotelConfigIdAndStatusIn(String hotelConfigId, List<OrderStatus> statuses);
+    List<Order> findByRestaurantIdAndOrderSourceOrderByCreatedAtDesc(Long restaurantId, String orderSource);
 }

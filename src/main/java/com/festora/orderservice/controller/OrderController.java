@@ -33,10 +33,11 @@ public class OrderController {
             @RequestHeader("X-Restaurant-Id") Long restaurantId,
             @RequestHeader("X-Table-No") Integer tableNumber,
             @RequestHeader("X-User-Id") String userId,
-            @RequestHeader(value = "X-Device-Id", required = false) String deviceId
+            @RequestHeader(value = "X-Device-Id", required = false) String deviceId,
+            @RequestParam(value = "activeOnly", defaultValue = "false") boolean activeOnly
     ) {
         try {
-            return new ResponseEntity<>(orderService.getAllOrdersForTableByRestaurantId(restaurantId, tableNumber, userId, deviceId), HttpStatus.OK);
+            return new ResponseEntity<>(orderService.getAllOrdersForTableByRestaurantId(restaurantId, tableNumber, userId, deviceId, activeOnly), HttpStatus.OK);
         } catch (Exception e){
             return new ResponseEntity<>(HttpStatus.BAD_REQUEST);
         }
