@@ -105,6 +105,17 @@ management:
     web:
       exposure:
         include: health,info,metrics
-  endpoint:
     health:
       show-details: always
+
+# Notification Service Configurations
+telegram:
+  bot:
+    username: ${TELEGRAM_BOT_USERNAME:dineSphereBot}
+    token: ${TELEGRAM_BOT_TOKEN:8663859581:AAHCWDWczxzkiF5J5WO7wNwqHkLdjNi_AIY}
+
+whatsapp:
+  meta:
+    token: ${WHATSAPP_META_TOKEN:EAA8cdDZAjJ4EBRuMBpYZCbMENRPcHVHNzrOChoiHOGh7ZB38acOaPHXN3vcOoEGE6F2ESBoWGhzyvIaHuCjV4GAbUBZA9yQJbbUJ2IadUHeycDaBrJ8lBJyZAULsz9yemMOUnCVbnAA2ksvaP7VuyV0jF9ZA3aUTpxikY71IamdFWQouRRzXFFdng5jZATwPXAgYkCZC5sKWS16CwkQi0HhjYrW8ZCCRs6G8NvAOngtvCKLiKEpCj0BRwfvHTbst6ZAFwik7uwz1K4MGfVY3V2crD0klpS}
+    phone-number-id: ${WHATSAPP_PHONE_NUMBER_ID:1184276304758930}
+    verify-token: ${WHATSAPP_VERIFY_TOKEN:my-test-verify-token}

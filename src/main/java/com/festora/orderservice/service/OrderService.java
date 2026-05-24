@@ -18,6 +18,7 @@ import com.festora.hotelservice.model.HotelConfig;
 import com.festora.hotelservice.repository.HotelConfigRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
@@ -40,6 +41,7 @@ public class OrderService {
     private final QrTableMappingRepository qrTableMappingRepository;
     private final SimpMessagingTemplate messagingTemplate;
     private final HotelConfigRepository hotelConfigRepository;
+    private final ApplicationEventPublisher eventPublisher;
 
     private Order saveAndBroadcast(Order order) {
         Order savedOrder = orderRepository.save(order);
@@ -72,7 +74,9 @@ public class OrderService {
             throw new IllegalStateException(e.getMessage());
         }
         order.setUpdatedAt(now());
-        return saveAndBroadcast(order);
+        Order finalOrder = saveAndBroadcast(order);
+        eventPublisher.publishEvent(new com.festora.orderservice.dto.event.OrderNotificationEvent(this, finalOrder, "CREATED"));
+        return finalOrder;
     }
 
     /* ===============================
@@ -135,6 +139,7 @@ public class OrderService {
         order.setStatus(OrderStatus.PAID);
         order.setUpdatedAt(now());
         saveAndBroadcast(order);
+        eventPublisher.publishEvent(new com.festora.orderservice.dto.event.OrderNotificationEvent(this, order, "PAID"));
     }
 
     /* ===============================
@@ -161,6 +166,8 @@ public class OrderService {
         order.setReason(reason);
         order.setUpdatedAt(now());
         saveAndBroadcast(order);
+        
+        eventPublisher.publishEvent(new com.festora.orderservice.dto.event.OrderNotificationEvent(this, order, "CANCELLED"));
 
         inventoryClient.release(orderId);
     }
