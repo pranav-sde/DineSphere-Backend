@@ -6,6 +6,9 @@ import com.festora.cartservice.model.AddonSnapshot;
 import com.festora.cartservice.model.Cart;
 import com.festora.cartservice.model.CartItem;
 import com.festora.cartservice.repository.CartRepository;
+import com.festora.hotelservice.model.HotelConfig;
+import com.festora.hotelservice.service.HotelConfigService;
+import com.festora.hotelservice.service.HotelRoomConfigService;
 import com.festora.orderservice.dto.CreateOrderRequest;
 import com.festora.orderservice.dto.GstResult;
 import com.festora.orderservice.gst.GstCalculator;
@@ -14,6 +17,7 @@ import com.festora.orderservice.model.OrderItem;
 import com.festora.orderservice.service.OrderService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.util.CollectionUtils;
 import org.springframework.util.ObjectUtils;
@@ -35,6 +39,7 @@ public class CartService {
     private final OrderService orderService;
     private final Executor cartExecutor;
     private final GstCalculator gstCalculator;
+    private final HotelRoomConfigService hotelRoomConfigService;
 
     public Cart addItem(AddToCartRequest cartReq) {
 
@@ -254,6 +259,15 @@ public class CartService {
     }
 
     public Object checkout(CheckoutRequest req) throws Exception {
+        if(ObjectUtils.isEmpty(req))
+            throw new IllegalArgumentException("Checkout Request is Empty");
+
+        if (StringUtils.isNoneBlank(req.getHotelConfigId(), req.getRoomNumber())) {
+            boolean isRoomValid = hotelRoomConfigService.validateRoom(req.getHotelConfigId(), req.getRoomNumber());
+            if (!isRoomValid)
+                throw new Exception("Room Entered is Not Valid, Please Check Again");
+        }
+
         Cart cart = cartRepo.findByRestaurantIdAndTableNumberAndUserId(
                 req.getRestaurantId(), req.getTableNumber(), req.getUserId()
         ).orElseThrow(() -> new NoSuchElementException("Cart not found"));
