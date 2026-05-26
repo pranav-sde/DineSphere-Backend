@@ -58,7 +58,7 @@ public class SecurityConfig {
                 )
 
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/auth/login", "/auth/signup", "/auth/refresh", "/auth/health", "/auth/session/**", "/auth/send-otp", "/auth/verify-otp").permitAll()
+                        .requestMatchers("/auth/login", "/auth/signup", "/auth/refresh", "/auth/health", "/auth/session/**", "/auth/send-otp", "/auth/verify-otp", "/auth/forgot-password", "/auth/verify-reset-otp", "/auth/reset-password").permitAll()
                         .requestMatchers("/cart/health", "/order/health", "/inventory/health", "/api/system/maintenance/**").permitAll()
                         .requestMatchers("/api/webhooks/**").permitAll()
                         .requestMatchers("/ws/**").permitAll()

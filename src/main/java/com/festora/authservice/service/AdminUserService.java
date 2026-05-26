@@ -137,4 +137,19 @@ public class AdminUserService {
                 .restaurantId(saved.getRestaurantId())
                 .build();
     }
+
+    public boolean existsByEmail(String email) {
+        if (email == null) return false;
+        return userRepository.existsByEmail(email.toLowerCase());
+    }
+
+    public void resetPassword(String email, String newPassword) {
+        if (email == null || newPassword == null) {
+            throw new RuntimeException("Email and password are required");
+        }
+        User user = userRepository.findByEmail(email.toLowerCase())
+                .orElseThrow(() -> new RuntimeException("User not found with email: " + email));
+        user.setPasswordHash(passwordEncoder.encode(newPassword));
+        userRepository.save(user);
+    }
 }
