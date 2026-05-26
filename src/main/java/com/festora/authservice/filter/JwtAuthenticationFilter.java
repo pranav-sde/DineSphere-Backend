@@ -61,6 +61,14 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             );
             SecurityContextHolder.getContext().setAuthentication(authentication);
 
+            // 3.5. Inject into MDC for downstream logging context
+            if (sid != null) {
+                org.slf4j.MDC.put("userId", sid);
+            }
+            if (restaurantId != null) {
+                org.slf4j.MDC.put("restaurantId", String.valueOf(restaurantId));
+            }
+
             // 4. Inject into Headers via Wrapper
             HeaderMapRequestWrapper wrappedRequest = new HeaderMapRequestWrapper(request);
             if (sid != null) wrappedRequest.addHeader("X-User-Id", sid);
