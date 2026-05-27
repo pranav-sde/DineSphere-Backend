@@ -60,4 +60,38 @@ The system supports:
 
 ---
 
-## 📁 Project Structure
+
+---
+
+## 📡 Sample API Endpoints
+
+| Method | Endpoint | Description |
+|--------|---------|------------|
+| POST | /orders | Create new order |
+| GET | /orders/{id} | Get order details |
+| PUT | /orders/{id} | Update order |
+| POST | /billing | Generate bill |
+| GET | /analytics | Fetch reports |
+
+---
+
+## 🧪 Testing
+mvn test
+
+
+---
+
+## 🛠️ Future Enhancements
+- Payment gateway integration
+- Multi-branch support
+- AI-based recommendations
+
+---
+
+## 🤝 Contributing
+Pull requests are welcome.
+
+---
+
+## 📄 License
+MIT
