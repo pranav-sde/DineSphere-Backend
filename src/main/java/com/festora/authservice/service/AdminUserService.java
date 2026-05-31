@@ -2,10 +2,12 @@ package com.festora.authservice.service;
 
 import com.festora.authservice.dto.CreateOwnerRequest;
 import com.festora.authservice.dto.UserResponse;
+import com.festora.authservice.dto.event.SignupNotificationEvent;
 import com.festora.authservice.enums.UserRole;
 import com.festora.authservice.model.User;
 import com.festora.authservice.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
@@ -15,6 +17,7 @@ public class AdminUserService {
 
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
+    private final ApplicationEventPublisher eventPublisher;
 
     public UserResponse createRestaurantOwner(CreateOwnerRequest req) {
 
@@ -52,6 +55,9 @@ public class AdminUserService {
                 .build();
 
         User saved = userRepository.save(user);
+
+        // Notify admin about new signup via WhatsApp & Telegram
+        eventPublisher.publishEvent(new SignupNotificationEvent(this, saved));
 
         return new UserResponse(
                 saved.getId(),

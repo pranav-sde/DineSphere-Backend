@@ -119,3 +119,11 @@ whatsapp:
     token: ${WHATSAPP_META_TOKEN:EAA8cdDZAjJ4EBRmt1VXo4AedVrRlzDeeSAEABnzP7I8XhHixkcd9IBIlZBugXNvXwAPr2Lj4EZChHq0IiPKVPZAijQAQtoZBWL4MuZAqgZCr5ZAOdEfcHJyf4q9VDJ9pGIMThmgl5nZBusJEkj8TXrRv0EfsOZCNh9Mux0guoqFXWdmTPfsHzidZCyYueZBSZCzIvrZAPAOtJWRIyw9GqSgYofvapGxWdja8ZCAKlBBccESZB3og}
     phone-number-id: ${WHATSAPP_PHONE_NUMBER_ID:1184276304758930}
     verify-token: ${WHATSAPP_VERIFY_TOKEN:my-test-verify-token}
+
+# Admin Notification (new signups, system alerts)
+admin:
+  notification:
+    enabled: true
+    whatsapp-phone: ${ADMIN_WHATSAPP_PHONE:919307712930}
+    telegram-chat-id: ${ADMIN_TELEGRAM_CHAT_ID:-1003817357522}
+
