@@ -10,6 +10,7 @@ import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
@@ -76,6 +77,22 @@ public class RedisUtils {
 
     public void delete(String key) {
         redisTemplate.delete(key);
+    }
+
+    /**
+     * Delete all keys matching a specific pattern.
+     * Useful for evicting related cache entries (e.g., customerMenu:101:*).
+     */
+    public void deleteKeysWithPattern(String pattern) {
+        try {
+            Set<String> keys = redisTemplate.keys(pattern);
+            if (keys != null && !keys.isEmpty()) {
+                redisTemplate.delete(keys);
+                log.debug("Deleted {} keys matching pattern: {}", keys.size(), pattern);
+            }
+        } catch (Exception e) {
+            log.error("Failed to delete keys with pattern: {}", pattern, e);
+        }
     }
 
     /**
