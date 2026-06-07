@@ -38,11 +38,30 @@ jobs:
           target: "/home/ubuntu/"
           overwrite: true
 
-      - name: Restart service
+      - name: Restart service with fallback
         uses: appleboy/ssh-action@v0.1.6
         with:
           host: ${{ secrets.EC2_HOST }}
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_SSH_KEY }}
           script: |
+            echo "Backing up current JAR..."
+            cp /home/ubuntu/app.jar /home/ubuntu/app.jar.bak || true
+
+            echo "Restarting service..."
             sudo systemctl restart dinesphere
+
+            sleep 5
+
+            echo "Checking if service is running..."
+            if ! systemctl is-active --quiet dinesphere; then
+              echo "Service failed! Rolling back..."
+
+              cp /home/ubuntu/app.jar.bak /home/ubuntu/app.jar
+              sudo systemctl restart dinesphere
+
+              echo "Rollback done. Old version restored."
+              exit 1
+            fi
+
+            echo "Service is running. Deployment successful."
