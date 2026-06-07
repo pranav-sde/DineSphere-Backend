@@ -131,6 +131,15 @@ public class HotelOrderService {
             log.warn("Failed to fetch restaurant owner phone number for hotel order: {}", e.getMessage());
         }
 
+        PaymentMode paymentMode = PaymentMode.CASH_ON_DELIVERY;
+        if (req.getPaymentMode() != null) {
+            PaymentMode requestedMode = PaymentMode.valueOf(req.getPaymentMode());
+            if (requestedMode == PaymentMode.ONLINE) {
+                throw new IllegalArgumentException("Online payment is temporarily disabled. Please use Cash on Delivery.");
+            }
+            paymentMode = requestedMode;
+        }
+
         return Order.builder()
                 .orderId(generateOrderId())
                 .restaurantId(hotel.getRestaurantId())
@@ -148,9 +157,7 @@ public class HotelOrderService {
                 .roomNumber(req.getRoomNumber())
                 .restaurantMobile(restaurantMobile)
                 // Payment
-                .paymentMode(req.getPaymentMode() != null
-                        ? PaymentMode.valueOf(req.getPaymentMode())
-                        : PaymentMode.ONLINE)
+                .paymentMode(paymentMode)
                 .items(resolvedItems)
                 .baseAmount(base)
                 .cgstAmount(gst.getCgst())

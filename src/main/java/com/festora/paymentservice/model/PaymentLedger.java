@@ -42,4 +42,9 @@ public class PaymentLedger {
     private String razorpayPaymentId;
 
     private String razorpaySignature;
+
+    private String paymentType; // "ORDER" or "SUBSCRIPTION"
+    private String userId;
+    private Integer subscriptionMonths;
+    private String subscriptionPlanId;
 }

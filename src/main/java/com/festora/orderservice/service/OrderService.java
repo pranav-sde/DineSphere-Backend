@@ -298,6 +298,15 @@ public class OrderService {
             }
         }
 
+        PaymentMode paymentMode = PaymentMode.CASH_ON_DELIVERY;
+        if (req.getPaymentMode() != null) {
+            PaymentMode requestedMode = PaymentMode.valueOf(req.getPaymentMode());
+            if (requestedMode == PaymentMode.ONLINE) {
+                throw new IllegalArgumentException("Online payment is temporarily disabled. Please use Cash on Delivery.");
+            }
+            paymentMode = requestedMode;
+        }
+
         return Order.builder()
                 .orderId(generateOrderId())
                 .restaurantId(req.getRestaurantId())
@@ -319,9 +328,7 @@ public class OrderService {
                 .roomNumber(req.getRoomNumber())
                 .restaurantMobile(restaurantMobile)
                 // Payment
-                .paymentMode(req.getPaymentMode() != null
-                        ? PaymentMode.valueOf(req.getPaymentMode())
-                        : PaymentMode.CASH_ON_DELIVERY)
+                .paymentMode(paymentMode)
                 .items(resolvedItems)
                 .baseAmount(base)
                 .cgstAmount(gst.getCgst())

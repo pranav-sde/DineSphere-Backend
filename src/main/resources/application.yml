@@ -48,6 +48,20 @@ app:
     token-ttl-seconds: 1800
   maintenance:
     secret: ${MAINTENANCE_SECRET:secure-maintenance-key-123}
+  subscription:
+    plans:
+      basic_monthly:
+        price: 799.0
+        months: 1
+      basic_yearly:
+        price: 7999.0
+        months: 12
+      premium_monthly:
+        price: 1299.0
+        months: 1
+      premium_yearly:
+        price: 12999.0
+        months: 12
 
 jwt:
   issuer: festora-auth

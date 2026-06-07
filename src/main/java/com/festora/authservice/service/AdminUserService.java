@@ -10,6 +10,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.annotation.Propagation;
 
 @Service
 @RequiredArgsConstructor
@@ -68,7 +70,13 @@ public class AdminUserService {
         );
     }
 
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void renewSubscription(String userId, int months) {
+        renewSubscription(userId, months, null);
+    }
+
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void renewSubscription(String userId, int months, String planName) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new RuntimeException("User not found"));
 
@@ -82,7 +90,7 @@ public class AdminUserService {
         }
         user.setActive(true);
         user.setSubscriptionExpiry(newExpiry);
-        user.setSubscriptionPlan(months + "_MONTHS");
+        user.setSubscriptionPlan(planName != null ? planName.toUpperCase() : months + "_MONTHS");
         userRepository.save(user);
     }
 

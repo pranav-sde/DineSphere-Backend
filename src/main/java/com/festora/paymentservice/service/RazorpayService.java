@@ -11,8 +11,10 @@ import com.festora.paymentservice.model.PaymentLedger;
 import com.festora.paymentservice.model.PaymentOutbox;
 import com.festora.paymentservice.repository.PaymentLedgerRepository;
 import com.festora.paymentservice.repository.PaymentOutboxRepository;
+import com.festora.paymentservice.config.SubscriptionPlanConfig;
+import com.festora.paymentservice.event.SubscriptionPaymentSuccessEvent;
+import org.springframework.context.ApplicationEventPublisher;
 
-import com.festora.orderservice.service.OrderService;
 import com.razorpay.Order;
 import com.razorpay.RazorpayClient;
 import com.razorpay.RazorpayException;
@@ -25,7 +27,9 @@ import org.springframework.transaction.annotation.Transactional;
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 import java.util.Map;
+import java.util.UUID;
 
 @Service
 @Slf4j
@@ -35,50 +39,46 @@ public class RazorpayService {
     private final RazorpayConfig razorpayConfig;
     private final PaymentLedgerRepository ledgerRepo;
     private final PaymentOutboxRepository outboxRepo;
-    private final OrderService orderService;
+    private final SubscriptionPlanConfig planConfig;
+    private final ApplicationEventPublisher eventPublisher;
+
 
     public RazorpayService(
             @Autowired(required = false) RazorpayClient razorpayClient,
             RazorpayConfig razorpayConfig,
             PaymentLedgerRepository ledgerRepo,
             PaymentOutboxRepository outboxRepo,
-            OrderService orderService
+            SubscriptionPlanConfig planConfig,
+            ApplicationEventPublisher eventPublisher
     ) {
         this.razorpayClient = razorpayClient;
         this.razorpayConfig = razorpayConfig;
         this.ledgerRepo = ledgerRepo;
         this.outboxRepo = outboxRepo;
-        this.orderService = orderService;
+        this.planConfig = planConfig;
+        this.eventPublisher = eventPublisher;
     }
 
-    /**
-     * Creates a Razorpay order and persists a PENDING ledger entry.
-     */
     @Transactional
-    public CreateOrderResponse createOrder(CreateOrderRequest request) {
+    public CreateOrderResponse createSubscriptionOrder(String userId, String planId) {
         if (razorpayClient == null) {
             throw new IllegalStateException("Razorpay is not configured. Set RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET environment variables.");
         }
-        
-        // Securely fetch order from DB to prevent tampering
-        com.festora.orderservice.model.Order dbOrder = orderService.getOrder(request.getOrderId());
-        if (dbOrder == null) {
-            throw new IllegalArgumentException("Order not found: " + request.getOrderId());
+
+        SubscriptionPlanConfig.PlanDetails plan = planConfig.getPlans().get(planId.toLowerCase());
+        if (plan == null) {
+            throw new IllegalArgumentException("Invalid subscription plan: " + planId);
         }
 
-        // Convert amount from rupees to paise
-        double amountInRupees = dbOrder.getTotalAmount();
+        double amountInRupees = plan.getPrice();
         int amountInPaise = (int) Math.round(amountInRupees * 100);
 
-        if (amountInPaise < 100) {
-            throw new IllegalArgumentException("Minimum amount is ₹1 (100 paise). Received: " + amountInPaise + " paise");
-        }
-
         try {
+            String receipt = "rcpt_sub_" + UUID.randomUUID().toString().replace("-", "").substring(0, 15);
             JSONObject orderRequest = new JSONObject();
             orderRequest.put("amount", amountInPaise);
-            orderRequest.put("currency", request.getCurrency() != null ? request.getCurrency() : "INR");
-            orderRequest.put("receipt", "receipt_" + request.getOrderId());
+            orderRequest.put("currency", "INR");
+            orderRequest.put("receipt", receipt);
 
             Order razorpayOrder = razorpayClient.orders.create(orderRequest);
 
@@ -88,7 +88,6 @@ public class RazorpayService {
 
             // Persist ledger entry in ATTEMPTED state
             PaymentLedger ledger = PaymentLedger.builder()
-                    .orderId(request.getOrderId())
                     .amount(amountInRupees)
                     .currency(currency)
                     .paymentMode(PaymentMode.PREPAID)
@@ -96,11 +95,15 @@ public class RazorpayService {
                     .status(PaymentStatus.ATTEMPTED)
                     .razorpayOrderId(razorpayOrderId)
                     .createdAt(System.currentTimeMillis())
+                    .paymentType("SUBSCRIPTION")
+                    .userId(userId)
+                    .subscriptionPlanId(planId)
+                    .subscriptionMonths(plan.getMonths())
                     .build();
 
             ledgerRepo.save(ledger);
 
-            log.info("Razorpay order created: {} for orderId: {}", razorpayOrderId, request.getOrderId());
+            log.info("Razorpay subscription order created: {} for userId: {} (Plan: {})", razorpayOrderId, userId, planId);
 
             return CreateOrderResponse.builder()
                     .razorpayOrderId(razorpayOrderId)
@@ -110,16 +113,13 @@ public class RazorpayService {
                     .build();
 
         } catch (RazorpayException e) {
-            log.error("Failed to create Razorpay order for orderId: {}", request.getOrderId(), e);
-            throw new RuntimeException("Failed to create Razorpay order: " + e.getMessage(), e);
+            log.error("Failed to create Razorpay subscription order for userId: {}", userId, e);
+            throw new RuntimeException("Failed to create Razorpay subscription order: " + e.getMessage(), e);
         }
     }
 
-    /**
-     * Verifies the Razorpay payment signature using HMAC-SHA256 and updates the ledger.
-     */
     @Transactional
-    public Map<String, String> verifyPayment(VerifyPaymentRequest request) {
+    public Map<String, String> verifySubscriptionPayment(VerifyPaymentRequest request) {
         if (request.getRazorpayOrderId() == null || request.getRazorpayPaymentId() == null
                 || request.getRazorpaySignature() == null) {
             throw new IllegalArgumentException("Missing required fields: razorpayOrderId, razorpayPaymentId, razorpaySignature");
@@ -134,7 +134,9 @@ public class RazorpayService {
         String payload = request.getRazorpayOrderId() + "|" + request.getRazorpayPaymentId();
         String generatedSignature = computeHmacSha256(payload, razorpayConfig.getKeySecret());
 
-        if (generatedSignature != null && generatedSignature.equals(request.getRazorpaySignature())) {
+        if (generatedSignature != null && MessageDigest.isEqual(
+                generatedSignature.getBytes(StandardCharsets.UTF_8),
+                request.getRazorpaySignature().getBytes(StandardCharsets.UTF_8))) {
             // Signature matches — payment is authentic
             ledger.setStatus(PaymentStatus.SUCCESS);
             ledger.setRazorpayPaymentId(request.getRazorpayPaymentId());
@@ -143,54 +145,38 @@ public class RazorpayService {
 
             // Create outbox event for downstream consumers
             PaymentOutbox outbox = PaymentOutbox.builder()
-                    .eventType("payment.success")
-                    .aggregateId(ledger.getOrderId())
+                    .eventType("subscription.payment.success")
+                    .aggregateId(ledger.getUserId())
                     .payload(buildPayload(ledger))
                     .published(false)
                     .createdAt(System.currentTimeMillis())
                     .build();
             outboxRepo.save(outbox);
 
-            log.info("Payment verified successfully for orderId: {}, razorpayPaymentId: {}",
-                    ledger.getOrderId(), request.getRazorpayPaymentId());
+            log.info("Subscription payment verified successfully for userId: {}, plan: {}, paymentId: {}",
+                    ledger.getUserId(), ledger.getSubscriptionPlanId(), request.getRazorpayPaymentId());
+
+            // Publish application event for decoupled subscription renewal
+            eventPublisher.publishEvent(new SubscriptionPaymentSuccessEvent(
+                    ledger.getUserId(),
+                    ledger.getSubscriptionMonths(),
+                    ledger.getPaymentId(),
+                    ledger.getSubscriptionPlanId()
+            ));
 
             return Map.of(
                     "status", "SUCCESS",
                     "paymentId", ledger.getPaymentId(),
-                    "orderId", ledger.getOrderId()
+                    "userId", ledger.getUserId()
             );
         } else {
             // Signature mismatch — do NOT mark as paid
             ledger.setStatus(PaymentStatus.FAILED);
             ledgerRepo.save(ledger);
 
-            // Create failed outbox event
-            PaymentOutbox outbox = PaymentOutbox.builder()
-                    .eventType("payment.failed")
-                    .aggregateId(ledger.getOrderId())
-                    .payload(buildPayload(ledger))
-                    .published(false)
-                    .createdAt(System.currentTimeMillis())
-                    .build();
-            outboxRepo.save(outbox);
-
-            log.warn("Payment signature mismatch for razorpayOrderId: {}", request.getRazorpayOrderId());
+            log.warn("Subscription payment signature mismatch for razorpayOrderId: {}", request.getRazorpayOrderId());
 
             throw new SecurityException("Payment signature verification failed");
-        }
-    }
-
-    /**
-     * Marks a Razorpay payment ledger entry as CANCELLED.
-     */
-    @Transactional
-    public void cancelPayment(String razorpayOrderId) {
-        if (razorpayOrderId == null) return;
-        PaymentLedger ledger = ledgerRepo.findByRazorpayOrderId(razorpayOrderId).orElse(null);
-        if (ledger != null && ledger.getStatus() == PaymentStatus.ATTEMPTED) {
-            ledger.setStatus(PaymentStatus.CANCELLED);
-            ledgerRepo.save(ledger);
-            log.info("Payment cancelled for razorpayOrderId: {}", razorpayOrderId);
         }
     }
 
@@ -214,28 +200,16 @@ public class RazorpayService {
     }
 
     private String buildPayload(PaymentLedger ledger) {
-        return String.format("""
-            {
-              "orderId": "%s",
-              "paymentId": "%s",
-              "amount": %.2f,
-              "currency": "%s",
-              "paymentMode": "%s",
-              "method": "%s",
-              "razorpayOrderId": "%s",
-              "razorpayPaymentId": "%s",
-              "timestamp": %d
-            }
-            """,
-                ledger.getOrderId(),
-                ledger.getPaymentId(),
-                ledger.getAmount(),
-                ledger.getCurrency(),
-                ledger.getPaymentMode(),
-                ledger.getPaymentMethod(),
-                ledger.getRazorpayOrderId() != null ? ledger.getRazorpayOrderId() : "",
-                ledger.getRazorpayPaymentId() != null ? ledger.getRazorpayPaymentId() : "",
-                ledger.getCreatedAt()
-        );
+        JSONObject payload = new JSONObject();
+        payload.put("orderId", ledger.getOrderId() != null ? ledger.getOrderId() : "");
+        payload.put("paymentId", ledger.getPaymentId() != null ? ledger.getPaymentId() : "");
+        payload.put("amount", ledger.getAmount());
+        payload.put("currency", ledger.getCurrency() != null ? ledger.getCurrency() : "");
+        payload.put("paymentMode", ledger.getPaymentMode() != null ? ledger.getPaymentMode().toString() : "");
+        payload.put("method", ledger.getPaymentMethod() != null ? ledger.getPaymentMethod().toString() : "");
+        payload.put("razorpayOrderId", ledger.getRazorpayOrderId() != null ? ledger.getRazorpayOrderId() : "");
+        payload.put("razorpayPaymentId", ledger.getRazorpayPaymentId() != null ? ledger.getRazorpayPaymentId() : "");
+        payload.put("timestamp", ledger.getCreatedAt());
+        return payload.toString();
     }
 }

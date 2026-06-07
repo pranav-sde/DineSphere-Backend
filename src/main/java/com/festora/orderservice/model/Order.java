@@ -50,7 +50,7 @@ public class Order {
 
     // Payment
     @Builder.Default
-    private PaymentMode paymentMode = PaymentMode.ONLINE;
+    private PaymentMode paymentMode = PaymentMode.CASH_ON_DELIVERY;
 
     private List<OrderItem> items;
 
