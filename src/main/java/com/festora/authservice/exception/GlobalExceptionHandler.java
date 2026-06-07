@@ -64,6 +64,11 @@ public class GlobalExceptionHandler {
     }
 
     private ResponseEntity<ApiError> build(HttpStatus status, String message) {
+        if (status.is5xxServerError()) {
+            log.error("API Server Error (5xx): {} - {}", status.value(), message);
+        } else {
+            log.warn("API Client Error (4xx): {} - {}", status.value(), message);
+        }
         return ResponseEntity
                 .status(status)
                 .body(new ApiError(message, status.value(), Instant.now()));

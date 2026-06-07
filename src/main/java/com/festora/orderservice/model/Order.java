@@ -46,6 +46,7 @@ public class Order {
     private String hotelName;
     private String mobileNumber;
     private String roomNumber;                     // String to support "A-101", "S2" etc.
+    private String restaurantMobile;
 
     // Payment
     @Builder.Default

@@ -14,6 +14,8 @@ import com.festora.orderservice.gst.GstCalculator;
 import com.festora.orderservice.model.Order;
 import com.festora.orderservice.model.OrderItem;
 import com.festora.orderservice.repository.OrderRepository;
+import com.festora.authservice.repository.UserRepository;
+import com.festora.authservice.model.User;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
@@ -42,6 +44,7 @@ public class HotelOrderService {
     private final MenuClient menuClient;
     private final GstCalculator gstCalculator;
     private final SimpMessagingTemplate messagingTemplate;
+    private final UserRepository userRepository;
 
     public Order createHotelOrder(CreateHotelOrderRequest req) throws Exception {
 
@@ -119,6 +122,15 @@ public class HotelOrderService {
 
         GstResult gst = gstCalculator.calculate(hotel.getRestaurantId(), base);
 
+        String restaurantMobile = null;
+        try {
+            restaurantMobile = userRepository.findByRestaurantId(hotel.getRestaurantId())
+                    .map(User::getPhoneNumber)
+                    .orElse(null);
+        } catch (Exception e) {
+            log.warn("Failed to fetch restaurant owner phone number for hotel order: {}", e.getMessage());
+        }
+
         return Order.builder()
                 .orderId(generateOrderId())
                 .restaurantId(hotel.getRestaurantId())
@@ -134,6 +146,7 @@ public class HotelOrderService {
                 .hotelName(hotel.getHotelName())
                 .mobileNumber(req.getMobileNumber())
                 .roomNumber(req.getRoomNumber())
+                .restaurantMobile(restaurantMobile)
                 // Payment
                 .paymentMode(req.getPaymentMode() != null
                         ? PaymentMode.valueOf(req.getPaymentMode())

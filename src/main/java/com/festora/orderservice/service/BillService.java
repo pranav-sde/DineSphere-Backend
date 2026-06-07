@@ -44,38 +44,50 @@ public class BillService {
         List<Order> unbilledOrders = orderRepository.findByRestaurantIdAndStatus(restaurantId, OrderStatus.PAYMENT_PENDING);
         List<UserBill> activeBills = userBillRepository.findByRestaurantIdAndStatus(restaurantId, BillingStatus.UNPAID);
 
-        Map<Integer, ActiveTableBillingSummary> summaryMap = new HashMap<>();
+        // Filter out hotel room service orders and bills from this summary
+        unbilledOrders = unbilledOrders.stream()
+                .filter(o -> o.getSeatingType() != SeatingType.HOTEL_ROOM)
+                .collect(Collectors.toList());
+        activeBills = activeBills.stream()
+                .filter(b -> b.getSeatingType() != SeatingType.HOTEL_ROOM)
+                .collect(Collectors.toList());
 
-        // Group unbilled orders
+        Map<String, ActiveTableBillingSummary> summaryMap = new HashMap<>();
+
+        // Group unbilled orders using composite key (seatingType + "_" + tableNumber) to avoid collisions
         for (Order order : unbilledOrders) {
-            summaryMap.computeIfAbsent(order.getTableNumber(), table -> 
+            SeatingType st = order.getSeatingType() != null ? order.getSeatingType() : SeatingType.TABLE;
+            String key = st + "_" + order.getTableNumber();
+            summaryMap.computeIfAbsent(key, k -> 
                 ActiveTableBillingSummary.builder()
-                        .tableNumber(table)
-                        .seatingType(order.getSeatingType() != null ? order.getSeatingType() : SeatingType.TABLE)
+                        .tableNumber(order.getTableNumber())
+                        .seatingType(st)
                         .unbilledOrdersCount(0)
                         .activeBillsCount(0)
                         .totalUnpaidAmount(0)
                         .build()
             );
             
-            ActiveTableBillingSummary summary = summaryMap.get(order.getTableNumber());
+            ActiveTableBillingSummary summary = summaryMap.get(key);
             summary.setUnbilledOrdersCount(summary.getUnbilledOrdersCount() + 1);
             summary.setTotalUnpaidAmount(summary.getTotalUnpaidAmount() + order.getTotalAmount());
         }
 
-        // Group active bills
+        // Group active bills using composite key to avoid collisions
         for (UserBill bill : activeBills) {
-            summaryMap.computeIfAbsent(bill.getTableNumber(), table -> 
+            SeatingType st = bill.getSeatingType() != null ? bill.getSeatingType() : SeatingType.TABLE;
+            String key = st + "_" + bill.getTableNumber();
+            summaryMap.computeIfAbsent(key, k -> 
                 ActiveTableBillingSummary.builder()
-                        .tableNumber(table)
-                        .seatingType(bill.getSeatingType() != null ? bill.getSeatingType() : SeatingType.TABLE)
+                        .tableNumber(bill.getTableNumber())
+                        .seatingType(st)
                         .unbilledOrdersCount(0)
                         .activeBillsCount(0)
                         .totalUnpaidAmount(0)
                         .build()
             );
             
-            ActiveTableBillingSummary summary = summaryMap.get(bill.getTableNumber());
+            ActiveTableBillingSummary summary = summaryMap.get(key);
             summary.setActiveBillsCount(summary.getActiveBillsCount() + 1);
             summary.setTotalUnpaidAmount(summary.getTotalUnpaidAmount() + bill.getTotalAmount());
         }
@@ -84,9 +96,14 @@ public class BillService {
     }
 
     public TableBillingResponse getTableBilling(Long restaurantId, int tableNumber) {
+        return getTableBilling(restaurantId, tableNumber, SeatingType.TABLE);
+    }
+
+    public TableBillingResponse getTableBilling(Long restaurantId, int tableNumber, SeatingType seatingType) {
+        SeatingType st = seatingType != null ? seatingType : SeatingType.TABLE;
         // Only fetch PAYMENT_PENDING orders for unbilled grouping
-        List<Order> unbilledOrders = orderRepository.findByRestaurantIdAndTableNumberAndStatus(restaurantId, tableNumber, OrderStatus.PAYMENT_PENDING);
-        List<UserBill> activeBills = userBillRepository.findByRestaurantIdAndTableNumberAndStatusOrderByCreatedAtDesc(restaurantId, tableNumber, BillingStatus.UNPAID);
+        List<Order> unbilledOrders = orderRepository.findByRestaurantIdAndTableNumberAndSeatingTypeAndStatus(restaurantId, tableNumber, st, OrderStatus.PAYMENT_PENDING);
+        List<UserBill> activeBills = userBillRepository.findByRestaurantIdAndTableNumberAndSeatingTypeAndStatusOrderByCreatedAtDesc(restaurantId, tableNumber, st, BillingStatus.UNPAID);
 
         Map<String, List<Order>> ordersByUser = unbilledOrders.stream()
                 .collect(Collectors.groupingBy(Order::getUserId));
@@ -118,8 +135,13 @@ public class BillService {
     }
 
     public UserBill generateBill(Long restaurantId, int tableNumber, String userId) {
+        return generateBill(restaurantId, tableNumber, SeatingType.TABLE, userId);
+    }
+
+    public UserBill generateBill(Long restaurantId, int tableNumber, SeatingType seatingType, String userId) {
+        SeatingType st = seatingType != null ? seatingType : SeatingType.TABLE;
         // Only generate bill from PAYMENT_PENDING orders
-        List<Order> unbilledOrders = orderRepository.findByRestaurantIdAndTableNumberAndUserIdAndStatus(restaurantId, tableNumber, userId, OrderStatus.PAYMENT_PENDING);
+        List<Order> unbilledOrders = orderRepository.findByRestaurantIdAndTableNumberAndSeatingTypeAndUserIdAndStatus(restaurantId, tableNumber, st, userId, OrderStatus.PAYMENT_PENDING);
         
         if (unbilledOrders.isEmpty()) {
             throw new IllegalStateException("No unbilled orders found for user at this table");
@@ -150,7 +172,7 @@ public class BillService {
                 .billId(generateBillId())
                 .restaurantId(restaurantId)
                 .tableNumber(tableNumber)
-                .seatingType(representative.getSeatingType() != null ? representative.getSeatingType() : SeatingType.TABLE)
+                .seatingType(st)
                 .orderSource(representative.getOrderSource() != null ? representative.getOrderSource() : OrderSource.DINE_IN)
                 .hotelConfigId(representative.getHotelConfigId())
                 .hotelName(representative.getHotelName())
@@ -221,7 +243,164 @@ public class BillService {
     }
 
     public void closeTable(Long restaurantId, int tableNumber) {
-        List<Order> orders = orderRepository.findByRestaurantIdAndTableNumberAndStatus(restaurantId, tableNumber, OrderStatus.PAID);
+        closeTable(restaurantId, tableNumber, SeatingType.TABLE);
+    }
+
+    public void closeTable(Long restaurantId, int tableNumber, SeatingType seatingType) {
+        SeatingType st = seatingType != null ? seatingType : SeatingType.TABLE;
+        List<Order> orders = orderRepository.findByRestaurantIdAndTableNumberAndSeatingTypeAndStatus(restaurantId, tableNumber, st, OrderStatus.PAID);
+        for (Order order : orders) {
+            order.setStatus(OrderStatus.CLOSED);
+            order.setUpdatedAt(System.currentTimeMillis());
+            orderRepository.save(order);
+            broadcastOrderUpdate(order);
+        }
+    }
+
+    // ── Hotel room service billing methods ──────────────────────────────────────────
+
+    public List<ActiveHotelBillingSummary> getActiveHotelBillingSummary(Long restaurantId, String hotelConfigId) {
+        List<Order> unbilledOrders = orderRepository.findByRestaurantIdAndHotelConfigIdAndStatus(restaurantId, hotelConfigId, OrderStatus.PAYMENT_PENDING);
+        List<UserBill> activeBills = userBillRepository.findByRestaurantIdAndHotelConfigIdAndStatus(restaurantId, hotelConfigId, BillingStatus.UNPAID);
+
+        Map<String, ActiveHotelBillingSummary> summaryMap = new HashMap<>();
+
+        // Group unbilled orders by roomNumber
+        for (Order order : unbilledOrders) {
+            String room = order.getRoomNumber() != null ? order.getRoomNumber() : "Unknown";
+            summaryMap.computeIfAbsent(room, r -> 
+                ActiveHotelBillingSummary.builder()
+                        .roomNumber(r)
+                        .unbilledOrdersCount(0)
+                        .activeBillsCount(0)
+                        .totalUnpaidAmount(0)
+                        .build()
+            );
+            ActiveHotelBillingSummary summary = summaryMap.get(room);
+            summary.setUnbilledOrdersCount(summary.getUnbilledOrdersCount() + 1);
+            summary.setTotalUnpaidAmount(summary.getTotalUnpaidAmount() + order.getTotalAmount());
+        }
+
+        // Group active bills by roomNumber
+        for (UserBill bill : activeBills) {
+            String room = bill.getRoomNumber() != null ? bill.getRoomNumber() : "Unknown";
+            summaryMap.computeIfAbsent(room, r -> 
+                ActiveHotelBillingSummary.builder()
+                        .roomNumber(r)
+                        .unbilledOrdersCount(0)
+                        .activeBillsCount(0)
+                        .totalUnpaidAmount(0)
+                        .build()
+            );
+            ActiveHotelBillingSummary summary = summaryMap.get(room);
+            summary.setActiveBillsCount(summary.getActiveBillsCount() + 1);
+            summary.setTotalUnpaidAmount(summary.getTotalUnpaidAmount() + bill.getTotalAmount());
+        }
+
+        return new ArrayList<>(summaryMap.values());
+    }
+
+    public HotelRoomBillingResponse getHotelRoomBilling(Long restaurantId, String hotelConfigId, String roomNumber) {
+        List<Order> unbilledOrders = orderRepository.findByRestaurantIdAndHotelConfigIdAndRoomNumberAndStatus(restaurantId, hotelConfigId, roomNumber, OrderStatus.PAYMENT_PENDING);
+        List<UserBill> activeBills = userBillRepository.findByRestaurantIdAndHotelConfigIdAndRoomNumberAndStatusOrderByCreatedAtDesc(restaurantId, hotelConfigId, roomNumber, BillingStatus.UNPAID);
+
+        Map<String, List<Order>> ordersByUser = unbilledOrders.stream()
+                .collect(Collectors.groupingBy(Order::getUserId));
+
+        List<TableUserOrderGroup> groups = new ArrayList<>();
+        int guestCount = 1;
+        for (Map.Entry<String, List<Order>> entry : ordersByUser.entrySet()) {
+            List<Order> userOrders = entry.getValue();
+            String label = userOrders.stream()
+                    .map(Order::getUserName)
+                    .filter(name -> name != null && !name.isBlank())
+                    .findFirst()
+                    .orElse("Guest " + guestCount++);
+
+            double total = userOrders.stream().mapToDouble(Order::getTotalAmount).sum();
+            groups.add(TableUserOrderGroup.builder()
+                    .userId(entry.getKey())
+                    .label(label)
+                    .orders(userOrders)
+                    .totalAmount(total)
+                    .build());
+        }
+
+        return HotelRoomBillingResponse.builder()
+                .roomNumber(roomNumber)
+                .unbilledOrders(groups)
+                .activeBills(activeBills)
+                .build();
+    }
+
+    public UserBill generateHotelBill(Long restaurantId, String hotelConfigId, String roomNumber, String userId) {
+        List<Order> unbilledOrders = orderRepository.findByRestaurantIdAndHotelConfigIdAndRoomNumberAndUserIdAndStatus(restaurantId, hotelConfigId, roomNumber, userId, OrderStatus.PAYMENT_PENDING);
+        
+        if (unbilledOrders.isEmpty()) {
+            throw new IllegalStateException("No unbilled orders found for user in this room");
+        }
+
+        List<String> orderIds = new ArrayList<>();
+        List<OrderItem> allItems = new ArrayList<>();
+        double baseAmount = 0;
+
+        for (Order order : unbilledOrders) {
+            orderIds.add(order.getOrderId());
+            allItems.addAll(order.getItems());
+            baseAmount += order.getBaseAmount();
+        }
+
+        GstResult gst = gstCalculator.calculate(restaurantId, baseAmount);
+
+        String userName = unbilledOrders.stream()
+                .map(Order::getUserName)
+                .filter(name -> name != null && !name.isBlank())
+                .findFirst()
+                .orElse("Guest");
+
+        Order representative = unbilledOrders.get(0);
+
+        UserBill bill = UserBill.builder()
+                .billId(generateBillId())
+                .restaurantId(restaurantId)
+                .tableNumber(0)
+                .seatingType(SeatingType.HOTEL_ROOM)
+                .orderSource(OrderSource.HOTEL_ROOM_SERVICE)
+                .hotelConfigId(hotelConfigId)
+                .hotelName(representative.getHotelName())
+                .mobileNumber(representative.getMobileNumber())
+                .roomNumber(roomNumber)
+                .paymentMode(representative.getPaymentMode() != null ? representative.getPaymentMode() : PaymentMode.ONLINE)
+                .userId(userId)
+                .userName(userName)
+                .orderIds(orderIds)
+                .items(allItems)
+                .baseAmount(baseAmount)
+                .cgstAmount(gst.getCgst())
+                .sgstAmount(gst.getSgst())
+                .gstAmount(gst.getTotalTax())
+                .totalAmount(baseAmount + gst.getTotalTax())
+                .status(BillingStatus.UNPAID)
+                .createdAt(System.currentTimeMillis())
+                .updatedAt(System.currentTimeMillis())
+                .build();
+
+        UserBill savedBill = userBillRepository.save(bill);
+
+        for (Order order : unbilledOrders) {
+            order.setStatus(OrderStatus.PAYMENT_REQUESTED);
+            order.setBillId(savedBill.getBillId());
+            order.setUpdatedAt(System.currentTimeMillis());
+            orderRepository.save(order);
+            broadcastOrderUpdate(order);
+        }
+
+        return savedBill;
+    }
+
+    public void closeHotelRoom(Long restaurantId, String hotelConfigId, String roomNumber) {
+        List<Order> orders = orderRepository.findByRestaurantIdAndHotelConfigIdAndRoomNumberAndStatusIn(
+                restaurantId, hotelConfigId, roomNumber, List.of(OrderStatus.PAID));
         for (Order order : orders) {
             order.setStatus(OrderStatus.CLOSED);
             order.setUpdatedAt(System.currentTimeMillis());

@@ -71,6 +71,58 @@ public class AuthController {
         adminUserService.renewSubscription(id, months);
     }
 
+    @PostMapping("/forgot-password")
+    public org.springframework.http.ResponseEntity<String> forgotPassword(@RequestBody java.util.Map<String, String> req) {
+        String email = req.get("email");
+        if (email == null || email.isEmpty()) {
+            return org.springframework.http.ResponseEntity.status(org.springframework.http.HttpStatus.BAD_REQUEST).body("Email is required");
+        }
+        
+        if (!adminUserService.existsByEmail(email)) {
+            return org.springframework.http.ResponseEntity.status(org.springframework.http.HttpStatus.NOT_FOUND).body("Email address is not registered");
+        }
+        
+        otpService.generateAndSendPasswordResetOtp(email);
+        return org.springframework.http.ResponseEntity.ok("Verification code sent successfully");
+    }
+
+    @PostMapping("/verify-reset-otp")
+    public org.springframework.http.ResponseEntity<String> verifyResetOtp(@RequestBody java.util.Map<String, String> req) {
+        String email = req.get("email");
+        String otp = req.get("otp");
+        
+        if (email == null || otp == null || email.isEmpty() || otp.isEmpty()) {
+            return org.springframework.http.ResponseEntity.status(org.springframework.http.HttpStatus.BAD_REQUEST).body("Email and verification code are required");
+        }
+        
+        if (otpService.verifyOtpAndSetVerified(email, otp)) {
+            return org.springframework.http.ResponseEntity.ok("Verification code successfully verified");
+        } else {
+            return org.springframework.http.ResponseEntity.status(org.springframework.http.HttpStatus.BAD_REQUEST).body("Invalid or expired verification code");
+        }
+    }
+
+    @PostMapping("/reset-password")
+    public org.springframework.http.ResponseEntity<String> resetPassword(@RequestBody java.util.Map<String, String> req) {
+        String email = req.get("email");
+        String newPassword = req.get("newPassword");
+        
+        if (email == null || newPassword == null || email.isEmpty() || newPassword.isEmpty()) {
+            return org.springframework.http.ResponseEntity.status(org.springframework.http.HttpStatus.BAD_REQUEST).body("Email and new password are required");
+        }
+        
+        if (!otpService.isEmailVerifiedForReset(email)) {
+            return org.springframework.http.ResponseEntity.status(org.springframework.http.HttpStatus.BAD_REQUEST).body("Invalid or expired verification session. Please verify your email again.");
+        }
+        
+        try {
+            adminUserService.resetPassword(email, newPassword);
+            return org.springframework.http.ResponseEntity.ok("Password has been successfully reset");
+        } catch (Exception e) {
+            return org.springframework.http.ResponseEntity.status(org.springframework.http.HttpStatus.INTERNAL_SERVER_ERROR).body(e.getMessage());
+        }
+    }
+
     @GetMapping("/profile")
     public com.festora.authservice.dto.OwnerProfileResponse getProfile(jakarta.servlet.http.HttpServletRequest request) {
         String userId = request.getHeader("X-User-Id");

@@ -10,7 +10,8 @@ spring:
     mongodb:
       uri: ${MONGODB_URI1:mongodb+srv://restrofoodiescanner_db_user:p6g4IAduGwk2t5To@pranav001.8l3iyj8.mongodb.net/food_qr_db?retryWrites=true&w=majority&maxPoolSize=50}
     redis:
-      url: ${REDIS_URL:rediss://default:gQAAAAAAAZfLAAIgcDI2MTQ3MzIwZjdlZWQ0MWM5OGMxZjdkODUzYzQ1N2EwMg@singular-albacore-104395.upstash.io:6379}
+      url: ${REDIS_URL:rediss://dineval-siys3c.serverless.aps1.cache.amazonaws.com:6379}
+      client-type: jedis
       timeout: 50s
       jedis:
         pool:
@@ -105,9 +106,28 @@ management:
     web:
       exposure:
         include: health,info,metrics
-  endpoint:
     health:
       show-details: always
+
+# Notification Service Configurations
+telegram:
+  bot:
+    username: ${TELEGRAM_BOT_USERNAME:dineSphereBot}
+    token: ${TELEGRAM_BOT_TOKEN:8663859581:AAHCWDWczxzkiF5J5WO7wNwqHkLdjNi_AIY}
+
+whatsapp:
+  meta:
+    token: ${WHATSAPP_META_TOKEN:EAA8cdDZAjJ4EBRmt1VXo4AedVrRlzDeeSAEABnzP7I8XhHixkcd9IBIlZBugXNvXwAPr2Lj4EZChHq0IiPKVPZAijQAQtoZBWL4MuZAqgZCr5ZAOdEfcHJyf4q9VDJ9pGIMThmgl5nZBusJEkj8TXrRv0EfsOZCNh9Mux0guoqFXWdmTPfsHzidZCyYueZBSZCzIvrZAPAOtJWRIyw9GqSgYofvapGxWdja8ZCAKlBBccESZB3og}
+    phone-number-id: ${WHATSAPP_PHONE_NUMBER_ID:1184276304758930}
+    verify-token: ${WHATSAPP_VERIFY_TOKEN:my-test-verify-token}
+
+# Admin Notification (new signups, system alerts)
+admin:
+  notification:
+    enabled: true
+    whatsapp-phone: ${ADMIN_WHATSAPP_PHONE:919307712930}
+    telegram-chat-id: ${ADMIN_TELEGRAM_CHAT_ID:-1003817357522}
+
 
 # Razorpay
 razorpay:

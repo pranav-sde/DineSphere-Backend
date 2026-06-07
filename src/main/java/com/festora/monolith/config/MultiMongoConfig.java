@@ -112,4 +112,17 @@ public class MultiMongoConfig {
             return new MongoTemplate(new SimpleMongoClientDatabaseFactory(mongoClient, "hotel_db"));
         }
     }
+
+    // --- Notification Service Config ---
+    @Configuration
+    @EnableMongoRepositories(
+            basePackages = "com.festora.notificationservice.repository",
+            mongoTemplateRef = "notificationMongoTemplate"
+    )
+    public static class NotificationMongoConfig {
+        @Bean
+        public MongoTemplate notificationMongoTemplate(MongoClient mongoClient) {
+            return new MongoTemplate(new SimpleMongoClientDatabaseFactory(mongoClient, "notification_db"));
+        }
+    }
 }

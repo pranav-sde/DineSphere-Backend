@@ -10,15 +10,16 @@ import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
 
 /**
- * Optimized Redis Utilities for Upstash Performance.
+ * Optimized Redis Utilities for Upstash/Valkey Performance.
  * 
  * H-methods (hput/hget): Uses Redis Hashes for efficient field-level access.
- * Z-methods (zput/zget): Uses GZIP compression to save Upstash bandwidth and requests.
+ * Z-methods (zput/zget): Uses GZIP compression to save bandwidth and requests.
  */
 @Component
 @RequiredArgsConstructor
@@ -46,7 +47,6 @@ public class RedisUtils {
 
     /**
      * Zipped Put: Compresses the object using GZIP before storing.
-     * drasticaly reduces Upstash bandwidth usage.
      */
     public void zput(String key, Object value, long ttl, TimeUnit unit) {
         try {
@@ -76,6 +76,22 @@ public class RedisUtils {
 
     public void delete(String key) {
         redisTemplate.delete(key);
+    }
+
+    /**
+     * Delete all keys matching a specific pattern.
+     * Useful for evicting related cache entries.
+     */
+    public void deleteKeysWithPattern(String pattern) {
+        try {
+            Set<String> keys = redisTemplate.keys(pattern);
+            if (keys != null && !keys.isEmpty()) {
+                redisTemplate.delete(keys);
+                log.debug("Deleted {} keys matching pattern: {}", keys.size(), pattern);
+            }
+        } catch (Exception e) {
+            log.error("Failed to delete keys with pattern: {}", pattern, e);
+        }
     }
 
     /**

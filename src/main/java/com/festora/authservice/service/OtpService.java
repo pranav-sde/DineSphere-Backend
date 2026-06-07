@@ -34,6 +34,18 @@ public class OtpService {
         log.info("Generated OTP for {}", email);
     }
 
+    public void generateAndSendPasswordResetOtp(String email) {
+        String otp = String.format("%06d", random.nextInt(1000000));
+        String key = OTP_KEY_PREFIX + email.toLowerCase();
+        
+        // Store OTP in Redis with 5 min expiry
+        redisUtils.put(key, otp, OTP_EXPIRY_MINUTES, TimeUnit.MINUTES);
+        
+        // Send async reset email
+        emailService.sendPasswordResetEmail(email, otp);
+        log.info("Generated Password Reset OTP for {}", email);
+    }
+
     public boolean verifyOtp(String email, String userOtp) {
         if (userOtp == null || userOtp.isEmpty()) return false;
         
@@ -41,6 +53,25 @@ public class OtpService {
         String storedOtp = redisUtils.get(key);
         
         if (storedOtp != null && storedOtp.equals(userOtp)) {
+            redisUtils.delete(key);
+            return true;
+        }
+        return false;
+    }
+
+    public boolean verifyOtpAndSetVerified(String email, String userOtp) {
+        if (verifyOtp(email, userOtp)) {
+            String key = VERIFIED_PREFIX + email.toLowerCase();
+            redisUtils.put(key, "true", VERIFIED_EXPIRY_MINUTES, TimeUnit.MINUTES);
+            return true;
+        }
+        return false;
+    }
+
+    public boolean isEmailVerifiedForReset(String email) {
+        String key = VERIFIED_PREFIX + email.toLowerCase();
+        String val = redisUtils.get(key);
+        if ("true".equals(val)) {
             redisUtils.delete(key);
             return true;
         }

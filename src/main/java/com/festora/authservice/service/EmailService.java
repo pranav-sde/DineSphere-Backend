@@ -40,4 +40,32 @@ public class EmailService {
             log.error("CRITICAL: Failed to send SMTP email to {}. Reason: {}", to, e.getMessage());
         }
     }
+
+    @Async
+    public void sendPasswordResetEmail(String to, String otp) {
+        try {
+            SimpleMailMessage message = new SimpleMailMessage();
+            message.setFrom(fromEmail);
+            message.setTo(to);
+            message.setSubject("DineSphere - Reset Your Password");
+            message.setText(String.format("""
+                    Hello,
+                    
+                    You requested to reset your DineSphere account password.
+                    
+                    Your verification code is: %s
+                    This code will expire in 5 minutes.
+                    
+                    If you did not request a password reset, please ignore this email.
+                    
+                    Best regards,
+                    The DineSphere Team
+                    """, otp));
+
+            mailSender.send(message);
+            log.info("Password reset OTP email sent successfully to {} via Gmail SMTP", to);
+        } catch (Exception e) {
+            log.error("CRITICAL: Failed to send SMTP email to {}. Reason: {}", to, e.getMessage());
+        }
+    }
 }

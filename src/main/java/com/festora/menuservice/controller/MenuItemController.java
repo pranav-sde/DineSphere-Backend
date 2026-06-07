@@ -21,7 +21,7 @@ public class MenuItemController {
 
     @GetMapping("/health")
     public ResponseEntity<String> health() {
-        return new ResponseEntity<>("Menu Service up", HttpStatus.OK);
+        return ResponseEntity.ok("Menu Service up");
     }
 
     @GetMapping("/customer/items-by-category")
@@ -32,8 +32,6 @@ public class MenuItemController {
     ) {
         return getItems(restaurantIdHeader, restaurantId, categoryId);
     }
-
-
 
     @PostMapping("/internal/menu/price")
     public ResponseEntity<MenuItemPriceResponse> calculatePrice(
@@ -49,13 +47,27 @@ public class MenuItemController {
             @RequestHeader("X-Restaurant-Id") Long restaurantId,
             @RequestParam(required = false) String categoryId
     ) {
-        if (restaurantId == null || restaurantId == 0)
-            restaurantId = 101L;
+        Long rid = resolveRestaurantId(restaurantId);
         try {
-            MenuItemPageResponse response = menuItemService.getMenuItemsResponse(restaurantId, categoryId);
-            return new ResponseEntity<>(response, HttpStatus.OK);
+            MenuItemPageResponse response = menuItemService.getMenuItemsForOwner(rid, categoryId);
+            return ResponseEntity.ok(response);
         } catch (Exception e) {
-            System.out.println(e.getMessage());
+            log.error("Error fetching items for owner: ", e);
+            return ResponseEntity.badRequest().build();
+        }
+    }
+
+    @GetMapping("/owner/items/all")
+    public ResponseEntity<MenuItemPageResponse> getAllItemsForOwner(
+            @RequestHeader("X-Restaurant-Id") Long restaurantId,
+            @RequestParam(required = false) String categoryId
+    ) {
+        Long rid = resolveRestaurantId(restaurantId);
+        try {
+            MenuItemPageResponse response = menuItemService.getMenuItemsForOwner(rid, categoryId);
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            log.error("Error fetching all items for owner: ", e);
             return ResponseEntity.badRequest().build();
         }
     }
@@ -110,5 +122,8 @@ public class MenuItemController {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
         }
     }
-}
 
+    private Long resolveRestaurantId(Long restaurantId) {
+        return (restaurantId == null || restaurantId == 0) ? 0L : restaurantId;
+    }
+}

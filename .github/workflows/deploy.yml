@@ -1,0 +1,100 @@
+name: Deploy to EC2
+
+on:
+  workflow_dispatch:
+
+jobs:
+
+  # 🏗️ Stage 1: Build
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Java
+        uses: actions/setup-java@v3
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+
+      - name: Build JAR
+        run: mvn clean package -DskipTests
+
+      - name: Rename JAR
+        run: mv target/*.jar target/app.jar
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-jar
+          path: target/app.jar
+
+
+  # 🧪 Stage 2: Test (minimal for now)
+  test:
+    runs-on: ubuntu-latest
+    needs: build
+
+    steps:
+      - name: Download artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: app-jar
+
+      - name: Basic check
+        run: |
+          echo "Artifact downloaded successfully"
+          ls -l
+
+
+  # 🚀 Stage 3: Deploy
+  deploy:
+    runs-on: ubuntu-latest
+    needs: test
+    environment: Prod
+
+    steps:
+      - name: Download artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: app-jar
+
+      - name: Copy JAR to EC2
+        uses: appleboy/scp-action@v0.1.3
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          source: "app.jar"
+          target: "/home/ubuntu/"
+          overwrite: true
+
+      - name: Restart service with rollback
+        uses: appleboy/ssh-action@v0.1.6
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            echo "Backing up current JAR..."
+            cp /home/ubuntu/app.jar /home/ubuntu/app.jar.bak || true
+            
+            echo "Restarting service..."
+            sudo systemctl restart dinesphere
+            
+            sleep 5
+            
+            echo "Checking service status..."
+            if ! systemctl is-active --quiet dinesphere; then
+              echo "Deployment failed! Rolling back..."
+            
+              cp /home/ubuntu/app.jar.bak /home/ubuntu/app.jar
+              sudo systemctl restart dinesphere
+            
+              echo "Rollback completed."
+              exit 1
+            fi
+            
+            echo "Deployment successful!"

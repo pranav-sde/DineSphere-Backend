@@ -12,6 +12,8 @@ import com.festora.menuservice.dto.MenuItemPriceResponse;
 import com.festora.monolith.util.RedisUtils;
 import io.micrometer.common.util.StringUtils;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.Cache;
 import org.springframework.cache.CacheManager;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
@@ -22,8 +24,9 @@ import org.springframework.util.ObjectUtils;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
-import java.util.stream.Collectors;
+import java.util.concurrent.TimeUnit;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class MenuItemService {
@@ -38,16 +41,16 @@ public class MenuItemService {
             Long restaurantId,
             String categoryId
     ) {
-
-        if (StringUtils.isBlank(categoryId))
+        if (StringUtils.isBlank(categoryId)) {
             return itemRepo.findByRestaurantId(restaurantId)
                     .stream()
-                    .filter(MenuItem::getEnabled)
+                    .filter(item -> Boolean.TRUE.equals(item.getEnabled()))
                     .map(menuMapper::toMenuItemDto)
                     .toList();
+        }
 
         return itemRepo
-                .findByRestaurantIdAndCategoryId(restaurantId, categoryId)
+                .findByRestaurantIdAndCategoryIdAndEnabled(restaurantId, categoryId, true)
                 .stream()
                 .map(menuMapper::toMenuItemDto)
                 .toList();
@@ -61,7 +64,7 @@ public class MenuItemService {
             Long restaurantId) {
         return itemRepo.findByRestaurantId(restaurantId)
                 .stream()
-                .filter(MenuItem::getEnabled)
+                .filter(item -> Boolean.TRUE.equals(item.getEnabled()))
                 .map(menuMapper::toMenuItemDto)
                 .toList();
     }
@@ -99,6 +102,7 @@ public class MenuItemService {
         entity.setUpdatedAt(System.currentTimeMillis());
 
         MenuItem saved = itemRepo.save(entity);
+        evictCustomerMenuCache(restaurantId);
         return menuMapper.toMenuItemDto(saved);
     }
 
@@ -119,6 +123,7 @@ public class MenuItemService {
         existing.setUpdatedAt(System.currentTimeMillis());
 
         MenuItem saved = itemRepo.save(existing);
+        evictCustomerMenuCache(saved.getRestaurantId());
         return menuMapper.toMenuItemDto(saved);
     }
 
@@ -135,6 +140,7 @@ public class MenuItemService {
         item.setEnabled(enabled);
         item.setUpdatedAt(System.currentTimeMillis());
         MenuItem saved = itemRepo.save(item);
+        evictCustomerMenuCache(saved.getRestaurantId());
     }
 
     @Cacheable(value = "menuPriceCache", key = "#request.menuItemId + ':' + #request.variantId + ':' + (#request.addonIds != null ? #request.addonIds.toString() : 'none')")
@@ -215,7 +221,7 @@ public class MenuItemService {
             return cached;
         }
 
-        // 2. Database Fallback
+        // 3. Database Fallback
         List<MenuItemDto> items;
         if (StringUtils.isBlank(categoryId)) {
             items = itemRepo.findByRestaurantId(restaurantId)
@@ -232,14 +238,61 @@ public class MenuItemService {
 
         MenuItemPageResponse response = MenuItemPageResponse.builder()
                 .items(items)
-                .totalElements(ObjectUtils.isEmpty(items) ? 0 : items.size())
+                .totalElements(items.size())
                 .build();
 
-        // 3. Save to both (RAM and Compressed Redis)
+        // 4. Save to both (RAM and Compressed Redis)
         if (ramCache != null) ramCache.put(cacheKey, response);
-        redisUtils.zput(cacheKey, response, 24, java.util.concurrent.TimeUnit.HOURS);
+        redisUtils.zput(cacheKey, response, 24, TimeUnit.HOURS);
 
         return response;
+    }
+
+    public MenuItemPageResponse getMenuItemsForOwner(
+            Long restaurantId,
+            String categoryId
+    ) {
+        if (restaurantId == null || restaurantId == 0) {
+            throw new IllegalArgumentException("RestaurantId cannot be empty");
+        }
+
+        List<MenuItemDto> items;
+        if (StringUtils.isBlank(categoryId)) {
+            items = itemRepo.findByRestaurantId(restaurantId)
+                    .stream()
+                    .map(menuMapper::toMenuItemDto)
+                    .toList();
+        } else {
+            items = itemRepo.findByRestaurantIdAndCategoryId(restaurantId, categoryId)
+                    .stream()
+                    .map(menuMapper::toMenuItemDto)
+                    .toList();
+        }
+
+        return MenuItemPageResponse.builder()
+                .items(items)
+                .totalElements(items.size())
+                .build();
+    }
+
+    /**
+     * Evicts both L1 (RAM) and L2 (Redis) customer menu caches
+     * so that changes reflect immediately on the customer side.
+     */
+    private void evictCustomerMenuCache(Long restaurantId) {
+        if (restaurantId == null) return;
+
+        // Evict L1 RAM cache
+        Cache ramCache = cacheManager.getCache("menuCache");
+        if (ramCache != null) {
+            ramCache.clear();
+        }
+
+        // Evict L2 compressed Redis cache (pattern-based)
+        String pattern = "customerMenu:" + restaurantId + ":*";
+        redisUtils.deleteKeysWithPattern(pattern);
+
+        log.info("Evicted customer menu cache for restaurantId: {}", restaurantId);
     }
 }
 

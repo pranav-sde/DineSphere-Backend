@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+
+    <!-- Console Appender with colored and structured logs including trace context -->
+    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} %magenta([traceId=%X{traceId:-none}]) %cyan([user=%X{userId:-guest}]) %yellow([rest=%X{restaurantId:-none}]) %highlight(%-5level) %logger{36} - %msg%n</pattern>
+        </encoder>
+    </appender>
+
+    <!-- Loki Appender for shipping logs directly to Grafana Cloud / Local Loki -->
+    <springProfile name="loki,prod">
+        <appender name="LOKI" class="com.github.loki4j.logback.Loki4jAppender">
+            <http class="com.github.loki4j.logback.JavaHttpSender">
+                <url>${LOKI_URL:-http://localhost:3100/loki/api/v1/push}</url>
+                <auth>
+                    <username>${LOKI_USERNAME:-}</username>
+                    <password>${LOKI_PASSWORD:-}</password>
+                </auth>
+                <!-- Set high timeouts for robustness in cloud envs -->
+                <connectionTimeoutMs>5000</connectionTimeoutMs>
+                <requestTimeoutMs>5000</requestTimeoutMs>
+            </http>
+            <format>
+                <label>
+                    <pattern>app=food-qr-monolith,host=${HOSTNAME},level=%level</pattern>
+                </label>
+                <message>
+                    <pattern>l=%level t=%thread c=%logger{36} traceId=%X{traceId:-none} userId=%X{userId:-guest} restaurantId=%X{restaurantId:-none} m=%message</pattern>
+                </message>
+                <sortByTime>true</sortByTime>
+            </format>
+        </appender>
+    </springProfile>
+
+    <!-- Logging Levels -->
+    <root level="INFO">
+        <appender-ref ref="CONSOLE" />
+        <springProfile name="loki,prod">
+            <appender-ref ref="LOKI" />
+        </springProfile>
+    </root>
+
+    <!-- Turn off high verbosity spring security/web logs for clean streaming -->
+    <logger name="org.springframework.web" level="INFO" />
+    <logger name="org.springframework.security" level="INFO" />
+    <logger name="com.festora" level="DEBUG" />
+
+</configuration>

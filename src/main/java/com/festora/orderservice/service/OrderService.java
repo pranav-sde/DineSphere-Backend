@@ -14,10 +14,13 @@ import com.festora.orderservice.model.Order;
 import com.festora.orderservice.model.OrderItem;
 import com.festora.orderservice.repository.OrderRepository;
 import com.festora.authservice.repository.QrTableMappingRepository;
+import com.festora.authservice.repository.UserRepository;
+import com.festora.authservice.model.User;
 import com.festora.hotelservice.model.HotelConfig;
 import com.festora.hotelservice.repository.HotelConfigRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
@@ -40,6 +43,8 @@ public class OrderService {
     private final QrTableMappingRepository qrTableMappingRepository;
     private final SimpMessagingTemplate messagingTemplate;
     private final HotelConfigRepository hotelConfigRepository;
+    private final ApplicationEventPublisher eventPublisher;
+    private final UserRepository userRepository;
 
     private Order saveAndBroadcast(Order order) {
         Order savedOrder = orderRepository.save(order);
@@ -72,7 +77,9 @@ public class OrderService {
             throw new IllegalStateException(e.getMessage());
         }
         order.setUpdatedAt(now());
-        return saveAndBroadcast(order);
+        Order finalOrder = saveAndBroadcast(order);
+        eventPublisher.publishEvent(new com.festora.orderservice.dto.event.OrderNotificationEvent(this, finalOrder, "CREATED"));
+        return finalOrder;
     }
 
     /* ===============================
@@ -164,6 +171,7 @@ public class OrderService {
         order.setPaymentMethod("COD");
         order.setUpdatedAt(now());
         saveAndBroadcast(order);
+        eventPublisher.publishEvent(new com.festora.orderservice.dto.event.OrderNotificationEvent(this, order, "PAID"));
     }
 
     /* ===============================
@@ -190,6 +198,8 @@ public class OrderService {
         order.setReason(reason);
         order.setUpdatedAt(now());
         saveAndBroadcast(order);
+        
+        eventPublisher.publishEvent(new com.festora.orderservice.dto.event.OrderNotificationEvent(this, order, "CANCELLED"));
 
         inventoryClient.release(orderId);
     }
@@ -267,6 +277,7 @@ public class OrderService {
         GstResult gst = gstCalculator.calculate(req.getRestaurantId(), base);
 
         String hotelName = null;
+        String restaurantMobile = null;
         if (req.getHotelConfigId() != null && !req.getHotelConfigId().isBlank()) {
             try {
                 hotelName = hotelConfigRepository.findById(req.getHotelConfigId())
@@ -274,6 +285,16 @@ public class OrderService {
                         .orElse(null);
             } catch (Exception e) {
                 log.warn("Failed to fetch hotel name for configId {}: {}", req.getHotelConfigId(), e.getMessage());
+            }
+        }
+
+        if (req.getSeatingType() != null && (SeatingType.valueOf(req.getSeatingType()) == SeatingType.HOTEL_ROOM || SeatingType.valueOf(req.getSeatingType()) == SeatingType.ROOM)) {
+            try {
+                restaurantMobile = userRepository.findByRestaurantId(req.getRestaurantId())
+                        .map(User::getPhoneNumber)
+                        .orElse(null);
+            } catch (Exception e) {
+                log.warn("Failed to fetch restaurant owner phone number: {}", e.getMessage());
             }
         }
 
@@ -296,6 +317,7 @@ public class OrderService {
                 .hotelName(hotelName)
                 .mobileNumber(req.getMobileNumber())
                 .roomNumber(req.getRoomNumber())
+                .restaurantMobile(restaurantMobile)
                 // Payment
                 .paymentMode(req.getPaymentMode() != null
                         ? PaymentMode.valueOf(req.getPaymentMode())
@@ -357,7 +379,17 @@ public class OrderService {
         if (orderId == null) {
             return null;
         }
-        return orderRepository.findByOrderId(orderId);
+        Order order = orderRepository.findByOrderId(orderId);
+        if (order != null && (order.getSeatingType() == SeatingType.HOTEL_ROOM || order.getSeatingType() == SeatingType.ROOM)) {
+            try {
+                userRepository.findByRestaurantId(order.getRestaurantId()).ifPresent(user -> {
+                    order.setRestaurantMobile(user.getPhoneNumber());
+                });
+            } catch (Exception e) {
+                log.warn("Failed to populate hotelMobile dynamically: {}", e.getMessage());
+            }
+        }
+        return order;
     }
 
     public void markInventoryBasedOnStatus(InventoryConsumerEvent request) {
