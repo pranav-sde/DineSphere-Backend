@@ -10,7 +10,7 @@ spring:
     mongodb:
       uri: ${MONGODB_URI1:mongodb+srv://restrofoodiescanner_db_user:p6g4IAduGwk2t5To@pranav001.8l3iyj8.mongodb.net/food_qr_db?retryWrites=true&w=majority&maxPoolSize=50}
     redis:
-      url: ${REDIS_URL:rediss://dineval-siys3c.serverless.aps1.cache.amazonaws.com:6379}
+      url: ${REDIS_URL:}
       client-type: jedis
       timeout: 50s
       jedis:
