@@ -1,5 +1,5 @@
 package com.festora.paymentservice.enums;
 
 public enum PaymentStatus {
-    SUCCESS, FAILED
+    SUCCESS, FAILED, PENDING, ATTEMPTED, CANCELLED
 }

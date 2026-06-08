@@ -85,12 +85,11 @@ public class OrderController {
         return ResponseEntity.ok(orderService.getOrder(orderId));
     }
 
-    // ==================================================
-    // 3) Payment Callback (Success)
-    // ==================================================
-    @PostMapping("/{orderId}/payment/success")
-    public ResponseEntity<Void> paymentSuccess(@PathVariable String orderId) {
-        orderService.onPaymentSuccess(orderId);
+
+
+    @PostMapping("/{orderId}/payment-method/cod")
+    public ResponseEntity<Void> selectCOD(@PathVariable String orderId) {
+        orderService.selectCOD(orderId);
         return ResponseEntity.ok().build();
     }
 

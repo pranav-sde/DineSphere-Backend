@@ -50,7 +50,7 @@ public class Order {
 
     // Payment
     @Builder.Default
-    private PaymentMode paymentMode = PaymentMode.ONLINE;
+    private PaymentMode paymentMode = PaymentMode.CASH_ON_DELIVERY;
 
     private List<OrderItem> items;
 
@@ -67,6 +67,11 @@ public class Order {
     private String reason;
 
     private String billId;
+    
+    // Payment Details
+    private String paymentMethod;
+    private String razorpayPaymentId;
+    
     // State
     private OrderStatus status;
 

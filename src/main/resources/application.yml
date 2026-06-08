@@ -48,6 +48,20 @@ app:
     token-ttl-seconds: 1800
   maintenance:
     secret: ${MAINTENANCE_SECRET:secure-maintenance-key-123}
+  subscription:
+    plans:
+      basic_monthly:
+        price: 799.0
+        months: 1
+      basic_yearly:
+        price: 7999.0
+        months: 12
+      premium_monthly:
+        price: 1299.0
+        months: 1
+      premium_yearly:
+        price: 12999.0
+        months: 12
 
 jwt:
   issuer: festora-auth
@@ -128,3 +142,8 @@ admin:
     whatsapp-phone: ${ADMIN_WHATSAPP_PHONE:919307712930}
     telegram-chat-id: ${ADMIN_TELEGRAM_CHAT_ID:-1003817357522}
 
+
+# Razorpay
+razorpay:
+  key-id: ${RAZORPAY_KEY_ID:}
+  key-secret: ${RAZORPAY_KEY_SECRET:}

@@ -35,4 +35,16 @@ public class PaymentLedger {
     private PaymentStatus status;
 
     private long createdAt;
+
+    @Indexed
+    private String razorpayOrderId;
+
+    private String razorpayPaymentId;
+
+    private String razorpaySignature;
+
+    private String paymentType; // "ORDER" or "SUBSCRIPTION"
+    private String userId;
+    private Integer subscriptionMonths;
+    private String subscriptionPlanId;
 }
