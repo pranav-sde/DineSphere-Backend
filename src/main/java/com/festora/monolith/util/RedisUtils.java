@@ -6,10 +6,15 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Component;
 
+import org.springframework.data.redis.core.Cursor;
+import org.springframework.data.redis.core.ScanOptions;
+
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.zip.GZIPInputStream;
@@ -84,10 +89,23 @@ public class RedisUtils {
      */
     public void deleteKeysWithPattern(String pattern) {
         try {
-            Set<String> keys = redisTemplate.keys(pattern);
-            if (keys != null && !keys.isEmpty()) {
-                redisTemplate.delete(keys);
-                log.debug("Deleted {} keys matching pattern: {}", keys.size(), pattern);
+            ScanOptions options = ScanOptions.scanOptions()
+                    .match(pattern)
+                    .count(1000)
+                    .build();
+            try (Cursor<String> cursor = redisTemplate.scan(options)) {
+                List<String> keys = new ArrayList<>();
+                while (cursor.hasNext()) {
+                    keys.add(cursor.next());
+                    if (keys.size() >= 1000) {
+                        redisTemplate.delete(keys);
+                        keys.clear();
+                    }
+                }
+                if (!keys.isEmpty()) {
+                    redisTemplate.delete(keys);
+                }
+                log.debug("Deleted keys matching pattern: {}", pattern);
             }
         } catch (Exception e) {
             log.error("Failed to delete keys with pattern: {}", pattern, e);
