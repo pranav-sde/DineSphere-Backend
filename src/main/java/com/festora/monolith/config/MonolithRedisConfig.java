@@ -10,11 +10,15 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Primary;
 import org.springframework.data.redis.cache.BatchStrategies;
+import org.springframework.data.redis.cache.BatchStrategy;
 import org.springframework.data.redis.cache.RedisCacheConfiguration;
 import org.springframework.data.redis.cache.RedisCacheManager;
 import org.springframework.data.redis.cache.RedisCacheWriter;
+import org.springframework.data.redis.connection.RedisConnection;
 import org.springframework.data.redis.connection.RedisConnectionFactory;
+import org.springframework.data.redis.core.Cursor;
 import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.core.ScanOptions;
 import org.springframework.data.redis.serializer.GenericJackson2JsonRedisSerializer;
 import org.springframework.data.redis.serializer.RedisSerializationContext;
 import org.springframework.data.redis.serializer.StringRedisSerializer;
@@ -68,9 +72,34 @@ public class MonolithRedisConfig {
                 .serializeValuesWith(RedisSerializationContext.SerializationPair.fromSerializer(serializer))
                 .disableCachingNullValues();
 
+        BatchStrategy clusterSafeBatchStrategy = new BatchStrategy() {
+            @Override
+            public long cleanCache(RedisConnection connection, String name, byte[] pattern) {
+                Cursor<byte[]> cursor = connection.scan(
+                        ScanOptions.scanOptions().match(pattern).count(1000).build()
+                );
+                long deletedCount = 0;
+                try {
+                    while (cursor.hasNext()) {
+                        try {
+                            connection.del(cursor.next());
+                            deletedCount++;
+                        } catch (Exception e) {
+                            log.warn("Failed to delete key during cache clear: {}", e.getMessage());
+                        }
+                    }
+                } finally {
+                    try {
+                        cursor.close();
+                    } catch (Exception ignore) {}
+                }
+                return deletedCount;
+            }
+        };
+
         RedisCacheWriter cacheWriter = RedisCacheWriter.nonLockingRedisCacheWriter(
                 connectionFactory,
-                BatchStrategies.scan(1000)
+                clusterSafeBatchStrategy
         );
 
         RedisCacheManager redisCacheManager = RedisCacheManager.builder(cacheWriter)

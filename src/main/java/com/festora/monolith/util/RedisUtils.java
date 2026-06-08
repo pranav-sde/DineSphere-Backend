@@ -80,7 +80,11 @@ public class RedisUtils {
     }
 
     public void delete(String key) {
-        redisTemplate.delete(key);
+        try {
+            redisTemplate.delete(key);
+        } catch (Exception e) {
+            log.error("Failed to delete key: {}", key, e);
+        }
     }
 
     /**
@@ -94,18 +98,17 @@ public class RedisUtils {
                     .count(1000)
                     .build();
             try (Cursor<String> cursor = redisTemplate.scan(options)) {
-                List<String> keys = new ArrayList<>();
+                int count = 0;
                 while (cursor.hasNext()) {
-                    keys.add(cursor.next());
-                    if (keys.size() >= 1000) {
-                        redisTemplate.delete(keys);
-                        keys.clear();
+                    String key = cursor.next();
+                    try {
+                        redisTemplate.delete(key);
+                        count++;
+                    } catch (Exception ex) {
+                        log.warn("Failed to delete key {} during pattern deletion: {}", key, ex.getMessage());
                     }
                 }
-                if (!keys.isEmpty()) {
-                    redisTemplate.delete(keys);
-                }
-                log.debug("Deleted keys matching pattern: {}", pattern);
+                log.debug("Deleted {} keys matching pattern: {}", count, pattern);
             }
         } catch (Exception e) {
             log.error("Failed to delete keys with pattern: {}", pattern, e);
