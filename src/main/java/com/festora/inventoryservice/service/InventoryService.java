@@ -8,7 +8,6 @@ import com.festora.inventoryservice.entity.*;
 import com.festora.inventoryservice.enums.ReservationStatus;
 import com.festora.inventoryservice.exception.OutOfStockException;
 import com.festora.inventoryservice.repo.*;
-import io.micrometer.common.util.StringUtils;
 import org.springframework.cache.CacheManager;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
@@ -71,24 +70,13 @@ public class InventoryService {
         Map<String, InventoryItem> invItemMap = new HashMap<>();
 
         for (ReservedItemRequest reqItem : request.getItems()) {
-            String variantId = reqItem.getVariantId();
-            String effectiveVariantId = StringUtils.isBlank(variantId) ? null : variantId;
+            String effectiveVariantId = normalizeVariantId(reqItem.getVariantId());
 
-            // Try exact match
             Optional<InventoryItem> itemOpt = inventoryItemRepo.findByRestaurantIdAndMenuItemIdAndVariantId(
                     request.getRestaurantId(),
                     reqItem.getMenuItemId(),
                     effectiveVariantId
             );
-
-            // Fallback: If not found and searching for null, try searching for empty string ""
-            if (itemOpt.isEmpty() && effectiveVariantId == null) {
-                itemOpt = inventoryItemRepo.findByRestaurantIdAndMenuItemIdAndVariantId(
-                        request.getRestaurantId(),
-                        reqItem.getMenuItemId(),
-                        ""
-                );
-            }
 
             InventoryItem item = itemOpt.orElse(null);
 
@@ -313,9 +301,8 @@ public class InventoryService {
             
             // If not found by ID (or ID not provided), try finding by menu item + variant
             if (item == null && upsertReq.getMenuItemId() != null && !upsertReq.getMenuItemId().isBlank()) {
-                String variantId = upsertReq.getVariantId();
-                if (variantId != null && variantId.isBlank()) variantId = null;
-                String key = upsertReq.getMenuItemId() + ":" + (variantId != null ? variantId : "");
+                String normalizedVId = normalizeVariantId(upsertReq.getVariantId());
+                String key = upsertReq.getMenuItemId() + ":" + (normalizedVId != null ? normalizedVId : "");
                 item = existingItemsMap.get(key);
             }
 
@@ -343,9 +330,7 @@ public class InventoryService {
                 InventoryItem newItem = new InventoryItem();
                 newItem.setRestaurantId(restaurantId);
                 newItem.setMenuItemId(upsertReq.getMenuItemId());
-                String vId = upsertReq.getVariantId();
-                if (vId != null && vId.isBlank()) vId = null;
-                newItem.setVariantId(vId);
+                newItem.setVariantId(normalizeVariantId(upsertReq.getVariantId()));
                 newItem.setTotalStock(upsertReq.getTotalStock());
                 newItem.setEnabled(upsertReq.isEnabled());
                 newItem.setUpdatedAt(now);
@@ -462,10 +447,8 @@ public class InventoryService {
 
     @Transactional
     public void createInventoryItem(CreateInventoryItemRequest req) {
-        String variantId = req.getVariantId();
-        if (variantId != null && variantId.isBlank()) {
-            variantId = null;
-        }
+        String variantId = normalizeVariantId(req.getVariantId());
+
         // Precise lookup (checks for null variant correctly)
         InventoryItem item = inventoryItemRepo.findByRestaurantIdAndMenuItemIdAndVariantId(
                 req.getRestaurantId(),
@@ -481,7 +464,7 @@ public class InventoryService {
 
         item.setRestaurantId(req.getRestaurantId());
         item.setMenuItemId(req.getMenuItemId());
-        item.setVariantId(req.getVariantId());
+        item.setVariantId(variantId);
         item.setTotalStock(req.getTotalStock());
         item.setEnabled(req.isEnabled());
         item.setUpdatedAt(now);
@@ -524,5 +507,15 @@ public class InventoryService {
             cacheManager.getCache("ownerInventory").evict(restaurantId);
             log.info("Evicted ownerInventory cache for restaurant {}", restaurantId);
         }
+    }
+
+    /**
+     * Canonical normalizer: blank/empty variantId → null.
+     * Every flow that reads or writes variantId MUST pass through this
+     * so that the unique index {restaurantId, menuItemId, variantId}
+     * can never be bypassed by "" vs null mismatches.
+     */
+    private String normalizeVariantId(String variantId) {
+        return (variantId == null || variantId.isBlank()) ? null : variantId.trim();
     }
 }
