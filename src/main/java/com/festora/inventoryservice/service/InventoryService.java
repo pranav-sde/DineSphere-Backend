@@ -78,6 +78,15 @@ public class InventoryService {
                     effectiveVariantId
             );
 
+            // Fallback for legacy data where variantId was saved as "" instead of null
+            if (itemOpt.isEmpty() && effectiveVariantId == null) {
+                itemOpt = inventoryItemRepo.findByRestaurantIdAndMenuItemIdAndVariantId(
+                        request.getRestaurantId(),
+                        reqItem.getMenuItemId(),
+                        ""
+                );
+            }
+
             InventoryItem item = itemOpt.orElse(null);
 
             if (item == null) {
@@ -455,6 +464,15 @@ public class InventoryService {
                 req.getMenuItemId(),
                 variantId
         ).orElse(null);
+
+        // Fallback for legacy data where variantId was saved as "" instead of null
+        if (item == null && variantId == null) {
+            item = inventoryItemRepo.findByRestaurantIdAndMenuItemIdAndVariantId(
+                    req.getRestaurantId(),
+                    req.getMenuItemId(),
+                    ""
+            ).orElse(null);
+        }
         
         if (!ObjectUtils.isEmpty(item))
             throw new IllegalStateException("Inventory already exists");
