@@ -63,7 +63,9 @@ public class OrderController {
     @PostMapping("/create")
     public ResponseEntity<OrderCreateResponse> createOrder(@RequestBody CreateOrderRequest request) {
         try {
+            log.info("[ORDER_INITIATED] deviceId={}, restaurantId={}, tableNumber={}", request.getDeviceId(), request.getRestaurantId(), request.getTableNumber());
             Order order = orderService.createOrder(request);
+            log.info("[ORDER_SUCCESS] orderId={}, deviceId={}, restaurantId={}, totalAmount={}", order.getOrderId(), request.getDeviceId(), request.getRestaurantId(), order.getTotalAmount());
 
             return ResponseEntity.status(HttpStatus.CREATED)
                     .body(OrderCreateResponse.builder()
@@ -72,7 +74,7 @@ public class OrderController {
                             .totalAmount(order.getTotalAmount())
                             .build());
         } catch (Exception e) {
-            log.error("Order creation failed for request {}: {}", request, e.getMessage(), e);
+            log.error("[ORDER_FAILED] deviceId={}, restaurantId={}, reason={}", request.getDeviceId(), request.getRestaurantId(), e.getMessage());
             return ResponseEntity.badRequest().build();
         }
     }
