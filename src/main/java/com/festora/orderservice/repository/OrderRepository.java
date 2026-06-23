@@ -33,6 +33,7 @@ public interface OrderRepository extends MongoRepository<Order, String> {
 
     List<Order> findByRestaurantIdAndCreatedAtBetween(Long restaurantId, long start, long end);
     List<Order> findByRestaurantIdAndTableNumberAndStatusNotIn(Long restaurantId, Integer tableNumber, List<OrderStatus> statuses);
+    List<Order> findByRestaurantIdAndStatusNotIn(Long restaurantId, List<OrderStatus> statuses);
 
     List<Order> findByRestaurantIdAndStatus(Long restaurantId, OrderStatus status);
     List<Order> findByRestaurantIdAndTableNumberAndStatus(Long restaurantId, Integer tableNumber, OrderStatus status);
