@@ -15,15 +15,21 @@ public class SubscriptionPlanConfig {
     private Map<String, PlanDetails> plans = new HashMap<>();
 
     public boolean hasKitchenCaptainFlow(String planId) {
-        return planId != null && (planId.startsWith("pro") || planId.startsWith("enterprise"));
+        if (planId == null) return false;
+        String lower = planId.toLowerCase();
+        return lower.startsWith("basic") || lower.startsWith("premium") || lower.equals("trial");
     }
 
     public boolean hasBarInventory(String planId) {
-        return planId != null && (planId.startsWith("pro") || planId.startsWith("enterprise"));
+        if (planId == null) return false;
+        String lower = planId.toLowerCase();
+        return lower.startsWith("basic") || lower.startsWith("premium") || lower.equals("trial");
     }
 
     public boolean hasAdvancedAnalytics(String planId) {
-        return planId != null && planId.startsWith("enterprise");
+        if (planId == null) return false;
+        String lower = planId.toLowerCase();
+        return lower.startsWith("premium");
     }
 
     @Data
