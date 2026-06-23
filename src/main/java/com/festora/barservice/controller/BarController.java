@@ -1,12 +1,16 @@
 package com.festora.barservice.controller;
 
+import com.festora.authservice.model.User;
+import com.festora.authservice.repository.UserRepository;
 import com.festora.barservice.model.BarInventoryItem;
 import com.festora.barservice.model.BarTicket;
 import com.festora.barservice.repository.BarTicketRepository;
 import com.festora.barservice.service.BarService;
 import com.festora.kitchenservice.enums.TicketStatus;
+import com.festora.paymentservice.config.SubscriptionPlanConfig;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -20,10 +24,39 @@ public class BarController {
 
     private final BarService barService;
     private final BarTicketRepository barTicketRepository;
+    private final UserRepository userRepository;
+    private final SubscriptionPlanConfig subscriptionPlanConfig;
+
+    private boolean checkKitchenFlow(Long restaurantId) {
+        if (restaurantId == null) return false;
+        String planId = userRepository.findByRestaurantId(restaurantId)
+            .map(User::getSubscriptionPlan)
+            .orElse("free");
+        return subscriptionPlanConfig.hasKitchenCaptainFlow(planId);
+    }
+
+    private boolean checkKitchenFlowForTicket(String ticketId) {
+        if (ticketId == null) return false;
+        Long restaurantId = barTicketRepository.findByTicketId(ticketId)
+            .map(BarTicket::getRestaurantId)
+            .orElse(null);
+        return checkKitchenFlow(restaurantId);
+    }
+
+    private boolean checkBarInventory(Long restaurantId) {
+        if (restaurantId == null) return false;
+        String planId = userRepository.findByRestaurantId(restaurantId)
+            .map(User::getSubscriptionPlan)
+            .orElse("free");
+        return subscriptionPlanConfig.hasBarInventory(planId);
+    }
 
     // Bartender's display: open bar tickets
     @GetMapping("/{restaurantId}/tickets")
     public ResponseEntity<List<BarTicket>> getOpenTickets(@PathVariable Long restaurantId) {
+        if (!checkKitchenFlow(restaurantId)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        }
         try {
             List<BarTicket> tickets = barTicketRepository.findByRestaurantIdAndStatusIn(
                     restaurantId, List.of(TicketStatus.OPEN, TicketStatus.IN_PROGRESS));
@@ -37,6 +70,9 @@ public class BarController {
     // Bartender marks drink ready
     @PutMapping("/tickets/{ticketId}/ready")
     public ResponseEntity<Void> markReady(@PathVariable String ticketId) {
+        if (!checkKitchenFlowForTicket(ticketId)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        }
         try {
             barService.markBarTicketReady(ticketId);
             return ResponseEntity.ok().build();
@@ -49,6 +85,9 @@ public class BarController {
     // Owner: view bar inventory
     @GetMapping("/{restaurantId}/inventory")
     public ResponseEntity<List<BarInventoryItem>> getInventory(@PathVariable Long restaurantId) {
+        if (!checkBarInventory(restaurantId)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        }
         try {
             return ResponseEntity.ok(barService.getBarInventory(restaurantId));
         } catch (Exception e) {
@@ -62,6 +101,9 @@ public class BarController {
     public ResponseEntity<BarInventoryItem> addBarItem(
             @PathVariable Long restaurantId,
             @RequestBody BarInventoryItem item) {
+        if (!checkBarInventory(restaurantId)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        }
         try {
             item.setRestaurantId(restaurantId);
             return ResponseEntity.ok(barService.addBarItem(item));
@@ -77,6 +119,9 @@ public class BarController {
             @PathVariable Long restaurantId,
             @PathVariable String itemId,
             @RequestParam double quantity) {
+        if (!checkBarInventory(restaurantId)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        }
         try {
             return ResponseEntity.ok(barService.updateStock(restaurantId, itemId, quantity));
         } catch (Exception e) {
@@ -88,6 +133,9 @@ public class BarController {
     // Owner: low stock items only
     @GetMapping("/{restaurantId}/inventory/low-stock")
     public ResponseEntity<List<BarInventoryItem>> getLowStock(@PathVariable Long restaurantId) {
+        if (!checkBarInventory(restaurantId)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        }
         try {
             return ResponseEntity.ok(barService.getLowStockItems(restaurantId));
         } catch (Exception e) {

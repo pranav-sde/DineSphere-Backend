@@ -14,6 +14,18 @@ public class SubscriptionPlanConfig {
 
     private Map<String, PlanDetails> plans = new HashMap<>();
 
+    public boolean hasKitchenCaptainFlow(String planId) {
+        return planId != null && (planId.startsWith("pro") || planId.startsWith("enterprise"));
+    }
+
+    public boolean hasBarInventory(String planId) {
+        return planId != null && (planId.startsWith("pro") || planId.startsWith("enterprise"));
+    }
+
+    public boolean hasAdvancedAnalytics(String planId) {
+        return planId != null && planId.startsWith("enterprise");
+    }
+
     @Data
     public static class PlanDetails {
         private double price;
