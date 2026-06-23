@@ -8,6 +8,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 import java.util.List;
+import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
@@ -61,6 +62,21 @@ public class TableRequestService {
 
         // 3. Broadcast WebSocket notification to dashboard
         messagingTemplate.convertAndSend("/topic/restaurant/" + restaurantId + "/requests", saved);
+
+        // Broadcast to captain topic
+        try {
+            messagingTemplate.convertAndSend(
+                "/topic/captain/" + restaurantId,
+                Map.of(
+                    "type", "CAPTAIN_CALLED",
+                    "tableNumber", tableNumber,
+                    "requestType", type,
+                    "timestamp", System.currentTimeMillis()
+                )
+            );
+        } catch (Exception e) {
+            log.error("Failed to notify captain via websocket: {}", e.getMessage());
+        }
 
         // 4. Dispatch to external channels (WhatsApp/Telegram)
         try {
