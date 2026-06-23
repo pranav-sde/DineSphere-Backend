@@ -22,6 +22,10 @@ import org.springframework.stereotype.Service;
 import java.util.*;
 import java.util.stream.Collectors;
 
+import com.festora.barservice.service.BarService;
+import com.festora.barservice.repository.BarTicketRepository;
+import com.festora.barservice.model.BarTicket;
+
 @Service
 @RequiredArgsConstructor
 @Slf4j
@@ -33,6 +37,8 @@ public class KitchenService {
     private final MenuItemRepository menuItemRepository;
     private final SimpMessagingTemplate messagingTemplate;
     private final ApplicationEventPublisher eventPublisher;
+    private final BarService barService;
+    private final BarTicketRepository barTicketRepository;
 
     // === HOOK POINT: Called from OrderService when owner finalizes order ===
     public void createTicketsForOrder(Order order) {
@@ -66,8 +72,9 @@ public class KitchenService {
 
         // Create one ticket per station
         for (Map.Entry<KitchenStation, List<TicketItem>> entry : stationMap.entrySet()) {
+            String ticketId = UUID.randomUUID().toString();
             KitchenTicket ticket = KitchenTicket.builder()
-                .ticketId(UUID.randomUUID().toString())
+                .ticketId(ticketId)
                 .orderId(order.getOrderId())
                 .restaurantId(order.getRestaurantId())
                 .tableNumber(order.getTableNumber())
@@ -82,13 +89,46 @@ public class KitchenService {
 
             ticketRepository.save(ticket);
 
-            // Push to correct kitchen station WebSocket channel
-            String topic = "/topic/kitchen/" + order.getRestaurantId()
-                         + "/" + entry.getKey().name().toLowerCase();
-            try {
-                messagingTemplate.convertAndSend(topic, ticket);
-            } catch (Exception e) {
-                log.error("Failed to send websocket message on topic {}: {}", topic, e.getMessage());
+            // Deduct bar stock if BAR or LIQUOR
+            if (entry.getKey() == KitchenStation.BAR || entry.getKey() == KitchenStation.LIQUOR) {
+                try {
+                    barService.deductBarStock(order.getRestaurantId(), entry.getValue());
+                } catch (Exception e) {
+                    log.error("Failed to deduct bar stock: {}", e.getMessage());
+                }
+            }
+
+            // If liquor order, create BarTicket and push to liquor topic
+            if (entry.getKey() == KitchenStation.LIQUOR) {
+                try {
+                    BarTicket barTicket = BarTicket.builder()
+                        .ticketId(ticketId)
+                        .orderId(order.getOrderId())
+                        .restaurantId(order.getRestaurantId())
+                        .tableNumber(order.getTableNumber())
+                        .isLiquorOrder(true)
+                        .drinks(entry.getValue())
+                        .status(TicketStatus.OPEN)
+                        .createdAt(System.currentTimeMillis())
+                        .updatedAt(System.currentTimeMillis())
+                        .build();
+
+                    barTicketRepository.save(barTicket);
+
+                    String liquorTopic = "/topic/kitchen/" + order.getRestaurantId() + "/liquor";
+                    messagingTemplate.convertAndSend(liquorTopic, barTicket);
+                } catch (Exception e) {
+                    log.error("Failed to handle liquor BarTicket: {}", e.getMessage());
+                }
+            } else {
+                // Push to correct kitchen station WebSocket channel
+                String topic = "/topic/kitchen/" + order.getRestaurantId()
+                             + "/" + entry.getKey().name().toLowerCase();
+                try {
+                    messagingTemplate.convertAndSend(topic, ticket);
+                } catch (Exception e) {
+                    log.error("Failed to send websocket message on topic {}: {}", topic, e.getMessage());
+                }
             }
         }
 
