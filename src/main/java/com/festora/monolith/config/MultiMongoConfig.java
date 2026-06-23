@@ -125,4 +125,43 @@ public class MultiMongoConfig {
             return new MongoTemplate(new SimpleMongoClientDatabaseFactory(mongoClient, "notification_db"));
         }
     }
+
+    // --- Kitchen Service Config ---
+    @Configuration
+    @EnableMongoRepositories(
+            basePackages = "com.festora.kitchenservice.repository",
+            mongoTemplateRef = "kitchenMongoTemplate"
+    )
+    public static class KitchenMongoConfig {
+        @Bean
+        public MongoTemplate kitchenMongoTemplate(MongoClient mongoClient) {
+            return new MongoTemplate(new SimpleMongoClientDatabaseFactory(mongoClient, "kitchen_db"));
+        }
+    }
+
+    // --- Captain Service Config ---
+    @Configuration
+    @EnableMongoRepositories(
+            basePackages = "com.festora.captainservice.repository",
+            mongoTemplateRef = "captainMongoTemplate"
+    )
+    public static class CaptainMongoConfig {
+        @Bean
+        public MongoTemplate captainMongoTemplate(MongoClient mongoClient) {
+            return new MongoTemplate(new SimpleMongoClientDatabaseFactory(mongoClient, "captain_db"));
+        }
+    }
+
+    // --- Bar Service Config ---
+    @Configuration
+    @EnableMongoRepositories(
+            basePackages = "com.festora.barservice.repository",
+            mongoTemplateRef = "barMongoTemplate"
+    )
+    public static class BarMongoConfig {
+        @Bean
+        public MongoTemplate barMongoTemplate(MongoClient mongoClient) {
+            return new MongoTemplate(new SimpleMongoClientDatabaseFactory(mongoClient, "bar_db"));
+        }
+    }
 }
