@@ -159,6 +159,135 @@ public class InventoryService {
     }
 
     /**
+     * Adds items to an EXISTING reservation (for admin order edits).
+     * Unlike tempReserve(), this does NOT create a new reservation —
+     * it finds the existing one and appends the new items to it.
+     *
+     * If no reservation exists yet (edge case), falls back to tempReserve().
+     */
+    public void addItemsToReservation(InventoryReserveRequest request) {
+
+        validateRequest(request);
+
+        String orderId = request.getOrderId();
+        InventoryReservation reservation = reservationRepo.findByOrderId(orderId).orElse(null);
+
+        if (reservation == null) {
+            // No existing reservation — fall back to creating a new one
+            log.info("No existing reservation for order {}, creating new one", orderId);
+            tempReserve(request);
+            return;
+        }
+
+        // Only add to TEMP_RESERVED reservations
+        if (reservation.getStatus() != ReservationStatus.TEMP_RESERVED) {
+            log.warn("Cannot add items to reservation in status: {} for order: {}",
+                    reservation.getStatus(), orderId);
+            return;
+        }
+
+        String reservationId = reservation.getReservationId();
+        long now = System.currentTimeMillis();
+
+        // Resolve inventory items and aggregate quantities (same logic as tempReserve)
+        Map<String, Integer> requiredQtyByInvItemId = new HashMap<>();
+        Map<String, InventoryItem> invItemMap = new HashMap<>();
+
+        for (ReservedItemRequest reqItem : request.getItems()) {
+            String effectiveVariantId = normalizeVariantId(reqItem.getVariantId());
+
+            Optional<InventoryItem> itemOpt = inventoryItemRepo.findByRestaurantIdAndMenuItemIdAndVariantId(
+                    request.getRestaurantId(),
+                    reqItem.getMenuItemId(),
+                    effectiveVariantId
+            );
+
+            // Fallback for legacy data where variantId was saved as "" instead of null
+            if (itemOpt.isEmpty() && effectiveVariantId == null) {
+                itemOpt = inventoryItemRepo.findByRestaurantIdAndMenuItemIdAndVariantId(
+                        request.getRestaurantId(),
+                        reqItem.getMenuItemId(),
+                        ""
+                );
+            }
+
+            InventoryItem item = itemOpt.orElse(null);
+
+            if (item == null) {
+                log.error("ITEM_NOT_FOUND during addItems: Restaurant={}, Menu={}, Variant={}",
+                        request.getRestaurantId(), reqItem.getMenuItemId(), effectiveVariantId);
+                throw new OutOfStockException("ITEM_NOT_FOUND");
+            }
+            if (!item.isEnabled()) {
+                throw new OutOfStockException("ITEM_DISABLED");
+            }
+
+            requiredQtyByInvItemId.merge(item.getId(), reqItem.getQuantity(), Integer::sum);
+            invItemMap.put(item.getId(), item);
+        }
+
+        // Fetch existing reservation items to handle unique index {reservationId, inventoryItemId}
+        List<InventoryReservationItem> existingResItems =
+                reservationItemRepo.findAllByReservationId(reservationId);
+        Map<String, InventoryReservationItem> existingResItemMap = new HashMap<>();
+        for (InventoryReservationItem ri : existingResItems) {
+            existingResItemMap.put(ri.getInventoryItemId(), ri);
+        }
+
+        for (Map.Entry<String, Integer> entry : requiredQtyByInvItemId.entrySet()) {
+            String invItemId = entry.getKey();
+            int additionalQty = entry.getValue();
+            InventoryItem item = invItemMap.get(invItemId);
+
+            InventoryStock stock = stockRepo.findById(invItemId).orElse(null);
+            if (stock == null) {
+                stock = new InventoryStock();
+                stock.setInventoryItemId(invItemId);
+                stock.setReservedQty(0);
+                stock.setConfirmedQty(0);
+                stock.setUpdatedAt(now);
+            }
+
+            int available = item.getTotalStock()
+                    - (stock.getReservedQty() + stock.getConfirmedQty());
+
+            if (available < additionalQty) {
+                throw new OutOfStockException("INSUFFICIENT_STOCK");
+            }
+
+            // Increment reserved qty
+            stock.setReservedQty(stock.getReservedQty() + additionalQty);
+            stock.setUpdatedAt(now);
+            stockRepo.save(stock);
+
+            // Upsert reservation item (handle unique compound index)
+            InventoryReservationItem existingRi = existingResItemMap.get(invItemId);
+            if (existingRi != null) {
+                // Same inventory item already reserved — add to its quantity
+                existingRi.setQuantity(existingRi.getQuantity() + additionalQty);
+                reservationItemRepo.save(existingRi);
+            } else {
+                // New inventory item for this reservation
+                InventoryReservationItem ri = new InventoryReservationItem();
+                ri.setReservationId(reservationId);
+                ri.setInventoryItemId(invItemId);
+                ri.setQuantity(additionalQty);
+                reservationItemRepo.save(ri);
+            }
+        }
+
+        // Refresh TTL so the reservation doesn't expire while admin is editing
+        long ttl = request.getTtlSeconds() == 0 ? 300 : request.getTtlSeconds();
+        reservation.setExpiresAt(now + ttl * 1000);
+        reservationRepo.save(reservation);
+
+        log.info("Added {} item(s) to existing reservation {} for order {}",
+                request.getItems().size(), reservationId, orderId);
+
+        evictCache(request.getRestaurantId());
+    }
+
+    /**
      * Confirm: evicts because reserved→confirmed changes availability.
      */
     public void confirmReservation(String orderId) {
@@ -194,9 +323,12 @@ public class InventoryService {
 
         InventoryReservation reservation = reservationRepo.findByOrderId(orderId).orElse(null);
         if (reservation == null ||
-                reservation.getStatus() == ReservationStatus.RELEASED) {
+                reservation.getStatus() == ReservationStatus.RELEASED ||
+                reservation.getStatus() == ReservationStatus.CANCELLED) {
             return;
         }
+
+        boolean wasConfirmed = reservation.getStatus() == ReservationStatus.CONFIRMED;
 
         List<InventoryReservationItem> items =
                 reservationItemRepo.findAllByReservationId(reservation.getReservationId());
@@ -206,7 +338,15 @@ public class InventoryService {
         for (InventoryReservationItem item : items) {
             InventoryStock stock = stockRepo.findById(item.getInventoryItemId()).orElse(null);
             if (stock != null) {
-                stock.setReservedQty(stock.getReservedQty() - item.getQuantity());
+                if (wasConfirmed) {
+                    // Order was already confirmed — release from confirmedQty
+                    int newConfirmed = stock.getConfirmedQty() - item.getQuantity();
+                    stock.setConfirmedQty(Math.max(newConfirmed, 0));
+                } else {
+                    // Order was still temp-reserved — release from reservedQty
+                    int newReserved = stock.getReservedQty() - item.getQuantity();
+                    stock.setReservedQty(Math.max(newReserved, 0));
+                }
                 stock.setUpdatedAt(now);
                 stockRepo.save(stock);
             }

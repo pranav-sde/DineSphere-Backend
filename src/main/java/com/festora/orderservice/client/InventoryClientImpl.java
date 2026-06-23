@@ -29,9 +29,8 @@ public class InventoryClientImpl implements InventoryClient {
 
     @Override
     public void tempReserve(Order order, List<OrderItem> newItems) {
-        log.info("Directly calling InventoryService.tempReserve for new items in order: {}", order.getOrderId());
-        // For simplicity, we just reserve everything again or as configured in the microservice earlier
-        inventoryService.tempReserve(mapRequest(order));
+        log.info("Reserving {} additional item(s) for order: {}", newItems.size(), order.getOrderId());
+        inventoryService.addItemsToReservation(mapRequestForItems(order, newItems));
     }
 
     @Override
@@ -47,12 +46,20 @@ public class InventoryClientImpl implements InventoryClient {
     }
 
     private com.festora.inventoryservice.dto.InventoryReserveRequest mapRequest(Order order) {
+        return mapRequestForItems(order, order.getItems());
+    }
+
+    /**
+     * Builds a reserve request from a specific subset of items (e.g. only newly added items).
+     */
+    private com.festora.inventoryservice.dto.InventoryReserveRequest mapRequestForItems(
+            Order order, List<OrderItem> items) {
         com.festora.inventoryservice.dto.InventoryReserveRequest request = new com.festora.inventoryservice.dto.InventoryReserveRequest();
         request.setOrderId(order.getOrderId());
         request.setRestaurantId(order.getRestaurantId());
         request.setTtlSeconds(RESERVE_TTL_SECONDS);
         
-        List<com.festora.inventoryservice.dto.ReservedItemRequest> items = order.getItems().stream().map(i -> {
+        List<com.festora.inventoryservice.dto.ReservedItemRequest> mapped = items.stream().map(i -> {
             com.festora.inventoryservice.dto.ReservedItemRequest item = new com.festora.inventoryservice.dto.ReservedItemRequest();
             item.setMenuItemId(i.getMenuItemId());
             item.setVariantId(i.getVariantId());
@@ -60,7 +67,7 @@ public class InventoryClientImpl implements InventoryClient {
             return item;
         }).collect(Collectors.toList());
         
-        request.setItems(items);
+        request.setItems(mapped);
         return request;
     }
 }
