@@ -20,6 +20,7 @@ import com.festora.hotelservice.model.HotelConfig;
 import com.festora.hotelservice.repository.HotelConfigRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import com.festora.kitchenservice.service.KitchenService;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.apache.commons.lang3.StringUtils;
@@ -45,6 +46,7 @@ public class OrderService {
     private final HotelConfigRepository hotelConfigRepository;
     private final ApplicationEventPublisher eventPublisher;
     private final UserRepository userRepository;
+    private final KitchenService kitchenService;
 
     private Order saveAndBroadcast(Order order) {
         Order savedOrder = orderRepository.save(order);
@@ -448,7 +450,9 @@ public class OrderService {
         // update status
         order.setStatus(OrderStatus.PREPARING);
         order.setUpdatedAt(now());
-        return saveAndBroadcast(order);
+        Order savedOrder = saveAndBroadcast(order);
+        kitchenService.createTicketsForOrder(savedOrder);
+        return savedOrder;
     }
 
     public Order updateOrderItems(String orderId, UpdateOrderItemsRequest request) {
@@ -578,7 +582,9 @@ public class OrderService {
         order.setStatus(OrderStatus.PREPARING);
         order.setUpdatedAt(now());
 
-        return saveAndBroadcast(order);
+        Order savedOrder = saveAndBroadcast(order);
+        kitchenService.createTicketsForOrder(savedOrder);
+        return savedOrder;
     }
 
     public List<Order> getActiveOwnerOrders(Long restaurantId) {

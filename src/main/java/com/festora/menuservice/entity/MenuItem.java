@@ -45,4 +45,6 @@ public class MenuItem {
 
     private Long createdAt;
     private Long updatedAt;
+
+    private String categoryTag; // "hot", "cold", "bar", "liquor", "dessert"
 }
