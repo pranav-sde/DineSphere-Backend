@@ -16,4 +16,5 @@ public class SessionStartResponse {
     private String refreshToken;
     private long expiresIn;
     private String hotelConfigId;
+    private String restaurantName;
 }

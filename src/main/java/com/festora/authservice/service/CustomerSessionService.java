@@ -4,8 +4,10 @@ import com.festora.authservice.dto.SessionStartRequest;
 import com.festora.authservice.dto.SessionStartResponse;
 import com.festora.authservice.model.CustomerSession;
 import com.festora.authservice.model.QrTableMapping;
+import com.festora.authservice.model.User;
 import com.festora.authservice.repository.CustomerSessionRepository;
 import com.festora.authservice.repository.QrTableMappingRepository;
+import com.festora.authservice.repository.UserRepository;
 import com.festora.authservice.utils.SessionJwtUtil;
 import com.festora.hotelservice.model.HotelConfig;
 import com.festora.hotelservice.repository.HotelConfigRepository;
@@ -29,6 +31,7 @@ public class CustomerSessionService {
     private final QrTableMappingRepository qrRepo;
     private final CustomerSessionRepository sessionRepo;
     private final HotelConfigRepository hotelConfigRepo;
+    private final UserRepository userRepository;
     private final SessionJwtUtil sessionJwtUtil;
     private final com.festora.authservice.customer.validator.SessionTokenValidator tokenValidator;
 
@@ -57,6 +60,10 @@ public class CustomerSessionService {
             Integer tableNumber = mapping.getTableNumber();
             SeatingType seatingType = mapping.getSeatingType() != null ? mapping.getSeatingType() : SeatingType.TABLE;
 
+            String restaurantName = userRepository.findByRestaurantId(restaurantId)
+                    .map(User::getRestaurantName)
+                    .orElse("DineSphere Restaurant");
+
             // 2. Check for existing session for this device+table
             Optional<CustomerSession> existingSession = sessionRepo.findByDeviceIdAndRestaurantIdAndTableNumber(
                     deviceId, restaurantId, tableNumber
@@ -70,7 +77,7 @@ public class CustomerSessionService {
                     sessionRepo.save(session);
 
                     return buildResponse(tableNumber, seatingType,
-                            session.getSessionId(), restaurantId, deviceId);
+                            session.getSessionId(), restaurantId, deviceId, restaurantName);
                 } else {
                     sessionRepo.delete(session);
                 }
@@ -88,7 +95,7 @@ public class CustomerSessionService {
                     .build();
             sessionRepo.save(session);
 
-            return buildResponse(tableNumber, seatingType, sessionId, restaurantId, deviceId);
+            return buildResponse(tableNumber, seatingType, sessionId, restaurantId, deviceId, restaurantName);
         } else {
             // Not in table mappings — check if it's a hotel config QR!
             HotelConfig hotel = hotelConfigRepo.findByQrId(qrId)
@@ -122,6 +129,7 @@ public class CustomerSessionService {
                     .refreshToken(refreshToken)
                     .expiresIn(4 * 60 * 60) // 4 hours in seconds
                     .hotelConfigId(hotel.getId())
+                    .restaurantName(hotel.getHotelName())
                     .build();
         }
     }
@@ -154,7 +162,11 @@ public class CustomerSessionService {
             session.setExpiryDate(new Date(System.currentTimeMillis() + REFRESH_TTL_MILLIS));
             sessionRepo.save(session);
 
-            return buildResponse(tableNumber, seatingType, sessionId, restaurantId, deviceId);
+            String restaurantName = userRepository.findByRestaurantId(restaurantId)
+                    .map(User::getRestaurantName)
+                    .orElse("DineSphere Restaurant");
+
+            return buildResponse(tableNumber, seatingType, sessionId, restaurantId, deviceId, restaurantName);
         } catch (Exception e) {
             throw new IllegalArgumentException("Invalid refresh token", e);
         }
@@ -163,7 +175,7 @@ public class CustomerSessionService {
     // ── Helper: builds a uniform response with tokens ──────────────────
     private SessionStartResponse buildResponse(
             Integer tableNumber, SeatingType seatingType,
-            String sessionId, Long restaurantId, String deviceId) {
+            String sessionId, Long restaurantId, String deviceId, String restaurantName) {
 
         return new SessionStartResponse(
                 tableNumber,
@@ -171,7 +183,8 @@ public class CustomerSessionService {
                 createToken(sessionId, restaurantId, tableNumber, deviceId, seatingType),
                 createRefreshToken(sessionId, restaurantId, tableNumber, deviceId, seatingType),
                 SESSION_TTL_MILLIS / 1000,
-                null
+                null,
+                restaurantName
         );
     }
 
