@@ -55,14 +55,14 @@ public class KitchenController {
     @GetMapping("/{restaurantId}/tickets")
     public ResponseEntity<List<KitchenTicket>> getTickets(
             @PathVariable Long restaurantId,
-            @RequestParam(required = false) TicketStatus status,
+            @RequestParam(required = false) List<TicketStatus> statuses,
             @RequestParam(required = false) KitchenStation station
     ) {
         if (!checkKitchenFlow(restaurantId)) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
         }
         try {
-            List<KitchenTicket> tickets = kitchenService.getTickets(restaurantId, status, station);
+            List<KitchenTicket> tickets = kitchenService.getTickets(restaurantId, statuses, station);
             return ResponseEntity.ok(tickets);
         } catch (Exception e) {
             log.error("Failed to fetch kitchen tickets: {}", e.getMessage());

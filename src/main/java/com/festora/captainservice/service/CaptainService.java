@@ -19,6 +19,7 @@ import org.springframework.stereotype.Service;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 @Service
@@ -49,13 +50,14 @@ public class CaptainService {
 
     // Captain's live dashboard — all their tables with status
     public List<CaptainTableView> getLiveTablesForCaptain(Long restaurantId, String captainId) {
-        TableZone zone = zoneRepository
-            .findByRestaurantIdAndAssignedCaptainId(restaurantId, captainId)
-            .orElseThrow(() -> new RuntimeException("No zone assigned to this captain"));
+        Optional<TableZone> zoneOpt = zoneRepository
+            .findByRestaurantIdAndAssignedCaptainId(restaurantId, captainId);
 
-        if (zone.getTableNumbers() == null) {
+        if (zoneOpt.isEmpty() || zoneOpt.get().getTableNumbers() == null) {
             return new ArrayList<>();
         }
+
+        TableZone zone = zoneOpt.get();
 
         return zone.getTableNumbers().stream().map(tableNo -> {
             List<Order> activeOrders = orderRepository

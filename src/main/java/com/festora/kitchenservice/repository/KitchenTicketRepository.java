@@ -20,4 +20,6 @@ public interface KitchenTicketRepository extends MongoRepository<KitchenTicket, 
     List<KitchenTicket> findByRestaurantIdAndStatusAndStation(Long restaurantId, TicketStatus status, KitchenStation station);
     List<KitchenTicket> findByRestaurantIdAndCreatedAtBetween(Long restaurantId, long start, long end);
     List<KitchenTicket> findByRestaurantIdAndTableNumberAndStatusIn(Long restaurantId, Integer tableNumber, List<TicketStatus> statusList);
+    List<KitchenTicket> findByRestaurantIdAndStatusInOrderByCreatedAtAsc(Long restaurantId, List<TicketStatus> statusList);
+    List<KitchenTicket> findByRestaurantIdAndStationAndStatusInOrderByCreatedAtAsc(Long restaurantId, KitchenStation station, List<TicketStatus> statusList);
 }

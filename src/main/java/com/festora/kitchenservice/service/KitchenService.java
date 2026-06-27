@@ -156,15 +156,16 @@ public class KitchenService {
         }
     }
 
-    public List<KitchenTicket> getTickets(Long restaurantId, TicketStatus status, KitchenStation station) {
-        if (status != null && station != null) {
-            return ticketRepository.findByRestaurantIdAndStatusAndStation(restaurantId, status, station);
-        } else if (status != null) {
-            return ticketRepository.findByRestaurantIdAndStatus(restaurantId, status);
-        } else if (station != null) {
-            return ticketRepository.findByRestaurantIdAndStation(restaurantId, station);
+    public List<KitchenTicket> getTickets(Long restaurantId, List<TicketStatus> statuses, KitchenStation station) {
+        List<TicketStatus> queryStatuses = statuses;
+        if (queryStatuses == null || queryStatuses.isEmpty()) {
+            queryStatuses = List.of(TicketStatus.OPEN, TicketStatus.IN_PROGRESS);
+        }
+
+        if (station != null) {
+            return ticketRepository.findByRestaurantIdAndStationAndStatusInOrderByCreatedAtAsc(restaurantId, station, queryStatuses);
         } else {
-            return ticketRepository.findByRestaurantId(restaurantId);
+            return ticketRepository.findByRestaurantIdAndStatusInOrderByCreatedAtAsc(restaurantId, queryStatuses);
         }
     }
 

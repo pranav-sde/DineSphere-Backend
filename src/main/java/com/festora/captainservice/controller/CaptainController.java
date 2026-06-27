@@ -9,6 +9,9 @@ import com.festora.captainservice.service.CaptainService;
 import com.festora.kitchenservice.model.KitchenTicket;
 import com.festora.kitchenservice.repository.KitchenTicketRepository;
 import com.festora.paymentservice.config.SubscriptionPlanConfig;
+import com.festora.orderservice.service.TableRequestService;
+import com.festora.orderservice.repository.TableRequestRepository;
+import com.festora.orderservice.model.TableRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
@@ -27,6 +30,8 @@ public class CaptainController {
     private final UserRepository userRepository;
     private final SubscriptionPlanConfig subscriptionPlanConfig;
     private final KitchenTicketRepository ticketRepository;
+    private final TableRequestService tableRequestService;
+    private final TableRequestRepository tableRequestRepository;
 
     private boolean checkKitchenFlow(Long restaurantId) {
         if (restaurantId == null) return false;
@@ -165,6 +170,24 @@ public class CaptainController {
             return ResponseEntity.ok(captainService.getActions(restaurantId, captainId, fromTime, toTime));
         } catch (Exception e) {
             log.error("Failed to get captain actions for restaurant {}: {}", restaurantId, e.getMessage());
+            return ResponseEntity.badRequest().build();
+        }
+    }
+
+    // Captain resolves a customer request (assistance, water, etc.)
+    @PutMapping("/requests/{requestId}/resolve")
+    public ResponseEntity<TableRequest> resolveRequest(
+            @PathVariable String requestId,
+            @RequestHeader("X-User-Id") String captainId) {
+        try {
+            TableRequest request = tableRequestRepository.findById(requestId)
+                .orElseThrow(() -> new IllegalArgumentException("Request not found"));
+            if (!checkKitchenFlow(request.getRestaurantId())) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+            }
+            return ResponseEntity.ok(tableRequestService.resolveRequest(requestId));
+        } catch (Exception e) {
+            log.error("Failed to resolve table request: {}", e.getMessage());
             return ResponseEntity.badRequest().build();
         }
     }
