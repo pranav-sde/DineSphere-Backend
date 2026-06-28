@@ -53,7 +53,7 @@ public class AdminUserService {
                 .longitude(req.getLongitude())
                 .active(true)
                 .subscriptionPlan("TRIAL")
-                .subscriptionExpiry(java.time.LocalDateTime.now().plusMonths(1))
+                .subscriptionExpiry(java.time.LocalDateTime.now().plusDays(15))
                 .build();
 
         User saved = userRepository.save(user);

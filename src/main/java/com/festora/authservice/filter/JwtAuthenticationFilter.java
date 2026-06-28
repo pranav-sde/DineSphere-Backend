@@ -99,10 +99,15 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                path.equals("/auth/refresh") ||
                path.equals("/auth/send-otp") ||
                path.equals("/auth/verify-otp") ||
+               path.equals("/auth/forgot-password") ||
+               path.equals("/auth/verify-reset-otp") ||
+               path.equals("/auth/reset-password") ||
+               path.equals("/subscription/plans") ||
                path.startsWith("/auth/session/") ||
                path.endsWith("/health") ||
                path.startsWith("/ws/") ||
-               path.startsWith("/api/system/maintenance/");
+               path.startsWith("/api/system/maintenance/") ||
+               path.startsWith("/api/webhooks/");
     }
 
     private static class HeaderMapRequestWrapper extends jakarta.servlet.http.HttpServletRequestWrapper {

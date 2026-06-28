@@ -38,6 +38,7 @@ resend:
 app:
   frontend :
     url : ${CUSTOMER_FRONTEND_URL:https://qr.dinesphere.co/qr?qrId=}
+    admin-url: ${ADMIN_FRONTEND_URL:https://admin.dinesphere.co}
 
   qr:
     secret: ${APP_QR_SECRET:TnsLD53NKeFsHhZ73ojREN9XLT8dIuuvmeSh/f3FU2KF7q4m11nf/PJivEuplO9U4tZDUW0JPPByW2VHOU2HMQ==}
@@ -62,6 +63,92 @@ app:
       premium_yearly:
         price: 12999.0
         months: 12
+    features:
+      tiers:
+        FREE:
+          maxMenuItems: 15
+          maxTables: 3
+          maxCategories: 3
+          whatsappNotifications: false
+          telegramNotifications: false
+          inventoryManagement: false
+          orderLogs: false
+          customBranding: false
+          multipleBranches: false
+          analyticsLevel: BASIC
+          prioritySupport: false
+        BASIC:
+          maxMenuItems: 100
+          maxTables: 20
+          maxCategories: 15
+          whatsappNotifications: true
+          telegramNotifications: true
+          inventoryManagement: true
+          orderLogs: true
+          customBranding: false
+          multipleBranches: false
+          analyticsLevel: STANDARD
+          prioritySupport: false
+        PREMIUM:
+          maxMenuItems: -1
+          maxTables: -1
+          maxCategories: -1
+          whatsappNotifications: true
+          telegramNotifications: true
+          inventoryManagement: true
+          orderLogs: true
+          customBranding: true
+          multipleBranches: true
+          analyticsLevel: ADVANCED
+          prioritySupport: true
+        # TRIAL mirrors PREMIUM so the 1-month free trial gets the full experience.
+        TRIAL:
+          maxMenuItems: -1
+          maxTables: -1
+          maxCategories: -1
+          whatsappNotifications: true
+          telegramNotifications: true
+          inventoryManagement: true
+          orderLogs: true
+          customBranding: true
+          multipleBranches: true
+          analyticsLevel: ADVANCED
+          prioritySupport: true
+      marketing:
+        FREE:
+          displayName: Free
+          tagline: Get your restaurant online with QR ordering essentials.
+          highlights:
+            - Up to 15 menu items
+            - Up to 3 QR tables
+            - Basic analytics
+            - Email support
+          popular: false
+        BASIC:
+          displayName: Basic
+          tagline: Everything a growing restaurant needs to run smoothly.
+          highlights:
+            - Up to 100 menu items
+            - Up to 20 QR tables
+            - WhatsApp + Telegram order alerts
+            - Inventory & stock management
+            - Order logs & audit trail
+            - Standard analytics
+          popular: true
+        PREMIUM:
+          displayName: Premium
+          tagline: Unlimited scale, custom branding and priority support.
+          highlights:
+            - Unlimited menu items & tables
+            - Custom branding & themes
+            - Multi-branch support
+            - Advanced analytics
+            - Priority support
+          popular: false
+    scheduler:
+      enabled: true
+      # 09:00 IST daily (03:30 UTC)
+      cron: "0 30 3 * * *"
 
 jwt:
   issuer: festora-auth
@@ -145,5 +232,5 @@ admin:
 
 # Razorpay
 razorpay:
-  key-id: ${RAZORPAY_KEY_ID:}
-  key-secret: ${RAZORPAY_KEY_SECRET:}
+  key-id: ${RAZORPAY_KEY_ID:rzp_test_Sypv6hPAbdMIhC}
+  key-secret: ${RAZORPAY_KEY_SECRET:PlEE8OCDcXfZjISE8gyUmdXb}

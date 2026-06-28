@@ -77,7 +77,7 @@ public class MultiMongoConfig {
     // --- Auth Service Config ---
     @Configuration
     @EnableMongoRepositories(
-            basePackages = "com.festora.authservice.repository",
+            basePackages = {"com.festora.authservice.repository", "com.festora.subscription.repository"},
             mongoTemplateRef = "authMongoTemplate"
     )
     public static class AuthMongoConfig {

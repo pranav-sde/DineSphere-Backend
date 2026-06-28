@@ -38,7 +38,8 @@ public class SecurityConfig {
                             "https://qrfooiesadmin.vercel.app",
                             "https://admin-snapdine.vercel.app",
                             "https://dinesphere.co",
-                            "https://qr.dinesphere.co"
+                            "https://qr.dinesphere.co",
+                            "https://admin.dinesphere.co"
                     ));
                     config.setAllowedMethods(java.util.List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
                     config.setAllowedHeaders(java.util.List.of("*"));
@@ -59,6 +60,7 @@ public class SecurityConfig {
 
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/auth/login", "/auth/signup", "/auth/refresh", "/auth/health", "/auth/session/**", "/auth/send-otp", "/auth/verify-otp", "/auth/forgot-password", "/auth/verify-reset-otp", "/auth/reset-password").permitAll()
+                        .requestMatchers("/subscription/plans").permitAll()
                         .requestMatchers("/cart/health", "/order/health", "/inventory/health", "/api/system/maintenance/**").permitAll()
                         .requestMatchers("/api/webhooks/**").permitAll()
                         .requestMatchers("/ws/**").permitAll()

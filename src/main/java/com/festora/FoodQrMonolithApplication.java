@@ -16,6 +16,15 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 public class FoodQrMonolithApplication {
 
 	public static void main(String[] args) {
-		SpringApplication.run(FoodQrMonolithApplication.class, args);
+		try {
+			SpringApplication.run(FoodQrMonolithApplication.class, args);
+		} catch (Throwable t) {
+			System.out.println("CRITICAL STARTUP ERROR:");
+			t.printStackTrace(System.out);
+			t.printStackTrace(System.err);
+			System.out.flush();
+			System.err.flush();
+			throw t;
+		}
 	}
 }
