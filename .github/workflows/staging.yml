@@ -7,11 +7,10 @@ on:
 
 jobs:
   deploy:
-
     runs-on: ubuntu-latest
+    environment: Staging
 
     steps:
-
       - uses: actions/checkout@v4
 
       - name: Setup Java
@@ -28,14 +27,14 @@ jobs:
           mkdir -p ~/.ssh
           echo "${{ secrets.STG_SSH_KEY }}" > ~/.ssh/id_ed25519
           chmod 600 ~/.ssh/id_ed25519
-          ssh-keyscan -H ${{ secrets.STG_HOST }} >> ~/.ssh/known_hosts
+          ssh-keyscan -H ${{ vars.STG_HOST }} >> ~/.ssh/known_hosts
 
       - name: Upload Jar
         run: |
           scp target/*.jar \
-          ${{ secrets.STG_USER }}@${{ secrets.STG_HOST }}:/home/ubuntu/stg.jar
+          ${{ vars.STG_USER }}@${{ vars.STG_HOST }}:/home/ubuntu/stg.jar
 
       - name: Restart Service
         run: |
-          ssh ${{ secrets.STG_USER }}@${{ secrets.STG_HOST }} \
+          ssh ${{ vars.STG_USER }}@${{ vars.STG_HOST }} \
           "sudo systemctl restart dinesphere-stg"
