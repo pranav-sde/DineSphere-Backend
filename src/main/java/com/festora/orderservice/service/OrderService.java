@@ -140,8 +140,6 @@ public class OrderService {
             throw new IllegalStateException("Invalid payment state");
         }
 
-        inventoryClient.confirm(orderId);
-
         if (order.getStatus() == OrderStatus.PAYMENT_PENDING || 
             order.getStatus() == OrderStatus.PAYMENT_REQUESTED) {
             order.setStatus(OrderStatus.PAID);
@@ -155,6 +153,8 @@ public class OrderService {
         }
         order.setUpdatedAt(now());
         saveAndBroadcast(order);
+
+        inventoryClient.confirm(orderId);
     }
 
     /* ===============================
@@ -608,7 +608,7 @@ public class OrderService {
             String variantId,
             List<String> addonIds
     ) {
-        List<String> addons = addonIds == null ? List.of() : addonIds;
+        List<String> addons = addonIds == null ? new ArrayList<>() : new ArrayList<>(addonIds);
         Collections.sort(addons);
         return menuItemId + "|" +
                 (variantId == null ? "" : variantId) + "|" +
