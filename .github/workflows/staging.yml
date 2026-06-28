@@ -37,6 +37,16 @@ jobs:
         run: |
           ssh-keygen -y -f ~/.ssh/id_ed25519 > /dev/null
 
+      - name: Load SSH key
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.STG_SSH_KEY }}
+
+      - name: Add host
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan -H ${{ vars.STG_HOST }} >> ~/.ssh/known_hosts
+
       - name: Upload Jar
         run: |
           scp -i ~/.ssh/id_ed25519 \
