@@ -11,63 +11,40 @@ jobs:
     environment: Staging
 
     steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Set up Java 21
-        uses: actions/setup-java@v4
+      - uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: "21"
           cache: maven
 
-      - name: Build Application
+      - name: Build
         run: mvn clean package -DskipTests
 
-      - name: Setup SSH
-        shell: bash
-        run: |
-          mkdir -p ~/.ssh
-          printf '%s' "${{ secrets.STG_SSH_KEY }}" > ~/.ssh/id_ed25519
-          chmod 600 ~/.ssh/id_ed25519
-
-          ssh-keyscan -H "${{ vars.STG_HOST }}" >> ~/.ssh/known_hosts
-
-      - name: Validate SSH Key
-        run: |
-          ssh-keygen -y -f ~/.ssh/id_ed25519 > /dev/null
-
-      - name: Load SSH key
+      - name: Load SSH Key
         uses: webfactory/ssh-agent@v0.9.0
         with:
           ssh-private-key: ${{ secrets.STG_SSH_KEY }}
 
-      - name: Add host
+      - name: Add Host
         run: |
           mkdir -p ~/.ssh
           ssh-keyscan -H ${{ vars.STG_HOST }} >> ~/.ssh/known_hosts
 
-      - name: Upload Jar
+      - name: Upload JAR
         run: |
-          scp -i ~/.ssh/id_ed25519 \
-          -o StrictHostKeyChecking=yes \
-          target/*.jar \
-          ${{ vars.STG_USER }}@${{ vars.STG_HOST }}:/home/ubuntu/stg.jar
+          scp target/*.jar \
+            ${{ vars.STG_USER }}@${{ vars.STG_HOST }}:/home/ubuntu/stg.jar
 
-      - name: Restart Staging Service
+      - name: Restart Service
         run: |
-          ssh -i ~/.ssh/id_ed25519 \
-          -o StrictHostKeyChecking=yes \
-          ${{ vars.STG_USER }}@${{ vars.STG_HOST }} \
+          ssh ${{ vars.STG_USER }}@${{ vars.STG_HOST }} \
           "sudo systemctl restart dinesphere-stg"
-
-      - name: Wait
-        run: sleep 20
 
       - name: Verify Service
         run: |
-          ssh -i ~/.ssh/id_ed25519 \
-          ${{ vars.STG_USER }}@${{ vars.STG_HOST }} \
+          ssh ${{ vars.STG_USER }}@${{ vars.STG_HOST }} \
           "systemctl is-active dinesphere-stg"
 
       - name: Health Check
