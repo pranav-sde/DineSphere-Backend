@@ -11,9 +11,11 @@ jobs:
     environment: Staging
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
 
-      - uses: actions/setup-java@v4
+      - name: Setup Java
+        uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: "21"
@@ -27,7 +29,7 @@ jobs:
         with:
           ssh-private-key: ${{ secrets.STG_SSH_KEY }}
 
-      - name: Add Host
+      - name: Add Server to Known Hosts
         run: |
           mkdir -p ~/.ssh
           ssh-keyscan -H ${{ vars.STG_HOST }} >> ~/.ssh/known_hosts
@@ -37,7 +39,7 @@ jobs:
           scp target/*.jar \
             ${{ vars.STG_USER }}@${{ vars.STG_HOST }}:/home/ubuntu/stg.jar
 
-      - name: Restart Service
+      - name: Restart Staging Service
         run: |
           ssh ${{ vars.STG_USER }}@${{ vars.STG_HOST }} \
           "sudo systemctl restart dinesphere-stg"
@@ -47,6 +49,19 @@ jobs:
           ssh ${{ vars.STG_USER }}@${{ vars.STG_HOST }} \
           "systemctl is-active dinesphere-stg"
 
-      - name: Health Check
+      - name: Wait for Application
         run: |
-          curl --fail https://stg-api.dinesphere.co/cart/health
+          echo "Waiting for application to become healthy..."
+
+          for i in {1..30}; do
+            if curl -fs https://stg-api.dinesphere.co/cart/health; then
+              echo "Application is healthy."
+              exit 0
+            fi
+
+            echo "Attempt $i/30 - application not ready yet..."
+            sleep 5
+          done
+
+          echo "Application failed health check."
+          exit 1
