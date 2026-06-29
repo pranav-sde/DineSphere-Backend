@@ -39,7 +39,9 @@ public class SecurityConfig {
                             "https://admin-snapdine.vercel.app",
                             "https://dinesphere.co",
                             "https://qr.dinesphere.co",
-                            "https://admin.dinesphere.co"
+                            "https://admin.dinesphere.co",
+                            "https://stg.dinesphere.co",
+                            "https://stg.qr.dinesphere.co"
                     ));
                     config.setAllowedMethods(java.util.List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
                     config.setAllowedHeaders(java.util.List.of("*"));
