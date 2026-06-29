@@ -64,6 +64,16 @@ public class OrderService {
             throw new Exception("Order request cant be empty");
         }
 
+        // Block ordering if the restaurant's subscription has expired.
+        if (req.getRestaurantId() != null) {
+            userRepository.findByRestaurantId(req.getRestaurantId()).ifPresent(owner -> {
+                if (owner.getSubscriptionExpiry() == null
+                        || owner.getSubscriptionExpiry().isBefore(java.time.LocalDateTime.now())) {
+                    throw new IllegalStateException("SUBSCRIPTION_EXPIRED");
+                }
+            });
+        }
+
         Order order = buildOrder(req);
         
         try {

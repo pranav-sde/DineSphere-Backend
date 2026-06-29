@@ -6,6 +6,7 @@ import com.festora.authservice.dto.event.SignupNotificationEvent;
 import com.festora.authservice.enums.UserRole;
 import com.festora.authservice.model.User;
 import com.festora.authservice.repository.UserRepository;
+import com.festora.paymentservice.config.SubscriptionPlanConfig;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -20,6 +21,7 @@ public class AdminUserService {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final ApplicationEventPublisher eventPublisher;
+    private final SubscriptionPlanConfig subscriptionPlanConfig;
 
     public UserResponse createRestaurantOwner(CreateOwnerRequest req) {
 
@@ -80,14 +82,22 @@ public class AdminUserService {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new RuntimeException("User not found"));
 
-        java.time.LocalDateTime currentExpiry = user.getSubscriptionExpiry();
-        java.time.LocalDateTime newExpiry;
-
-        if (currentExpiry == null || currentExpiry.isBefore(java.time.LocalDateTime.now())) {
-            newExpiry = java.time.LocalDateTime.now().plusMonths(months);
-        } else {
-            newExpiry = currentExpiry.plusMonths(months);
+        // Validate plan ID against known plans
+        if (planName != null && !planName.isBlank()) {
+            String normalizedPlan = planName.trim().toUpperCase();
+            if (normalizedPlan.equals("TRIAL")) {
+                throw new IllegalArgumentException("TRIAL plan cannot be renewed or switched to — it is a one-time signup offer");
+            }
+            boolean planExists = subscriptionPlanConfig.getPlans() != null
+                    && subscriptionPlanConfig.getPlans().containsKey(planName.trim().toLowerCase());
+            if (!planExists) {
+                throw new IllegalArgumentException("Unknown subscription plan: " + planName);
+            }
         }
+
+        // New plan always starts fresh from now — no proration credit from previous plan.
+        // This means switching plans forfeits any remaining days on the old plan.
+        java.time.LocalDateTime newExpiry = java.time.LocalDateTime.now().plusMonths(months);
         user.setActive(true);
         user.setSubscriptionExpiry(newExpiry);
         user.setSubscriptionPlan(planName != null ? planName.toUpperCase() : months + "_MONTHS");

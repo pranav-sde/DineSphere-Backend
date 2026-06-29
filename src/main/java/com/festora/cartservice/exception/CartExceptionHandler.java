@@ -47,6 +47,7 @@ public class CartExceptionHandler {
             case "Cart empty" -> "Your cart is empty. Please add some items before checking out.";
             case "ORDER_NOT_EDITABLE" -> "This order can no longer be modified as it is already being prepared.";
             case "EMPTY_ORDER" -> "Your order must contain at least one item.";
+            case "SUBSCRIPTION_EXPIRED" -> "This restaurant is not accepting orders right now.";
             default -> technicalCode.contains(" ") ? technicalCode : "Order creation failed: " + technicalCode;
         };
     }
