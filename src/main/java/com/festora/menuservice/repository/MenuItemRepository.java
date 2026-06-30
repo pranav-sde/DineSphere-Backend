@@ -16,4 +16,6 @@ public interface MenuItemRepository extends MongoRepository<MenuItem, String> {
     List<MenuItem> findByRestaurantId(Long restaurantId);
 
     List<MenuItem> findByRestaurantIdAndCategoryIdAndEnabled(Long restaurantId, String categoryId, Boolean enabled);
+
+    long countByRestaurantIdAndEnabled(Long restaurantId, Boolean enabled);
 }

@@ -9,6 +9,8 @@ import com.festora.orderservice.dto.TableBillingResponse;
 import com.festora.orderservice.enums.SeatingType;
 import com.festora.orderservice.model.UserBill;
 import com.festora.orderservice.service.BillService;
+import com.festora.subscription.config.PlanFeatures;
+import com.festora.subscription.service.SubscriptionFeatureService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -21,6 +23,7 @@ import java.util.List;
 public class AdminBillController {
 
     private final BillService billService;
+    private final SubscriptionFeatureService featureService;
 
     @GetMapping("/tables")
     public ResponseEntity<List<ActiveTableBillingSummary>> getActiveTableBillingSummary(
@@ -65,8 +68,12 @@ public class AdminBillController {
     }
 
     @GetMapping("/paid")
-    public ResponseEntity<List<UserBill>> getPaidBills(
+    public ResponseEntity<?> getPaidBills(
             @RequestHeader("X-Restaurant-Id") Long restaurantId) {
+        PlanFeatures features = featureService.getFeaturesForRestaurant(restaurantId);
+        if (!features.isOrderLogs()) {
+            return ResponseEntity.status(403).body(java.util.Map.of("error", "Order logs & audit trail features are not available on your plan. Please upgrade."));
+        }
         return ResponseEntity.ok(billService.getPaidBills(restaurantId));
     }
 

@@ -4,9 +4,12 @@ import com.festora.subscription.config.PlanFeatureConfig;
 import com.festora.subscription.config.PlanFeatures;
 import com.festora.subscription.config.PlanTier;
 import com.festora.authservice.model.User;
+import com.festora.authservice.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.cache.annotation.CacheEvict;
 
 import java.time.LocalDateTime;
 import java.util.Optional;
@@ -21,6 +24,7 @@ import java.util.Optional;
  *   <li>Otherwise the stored {@code subscriptionPlan} string is mapped to a tier:
  *       {@code basic_*} -> {@link PlanTier#BASIC}, {@code premium_*} -> {@link PlanTier#PREMIUM},
  *       {@code TRIAL} -> {@link PlanTier#TRIAL}. Unknown values fall back to {@link PlanTier#FREE}.</li>
+ *   <li>Features resolution is optimized via caching by {@code restaurantId} (L1 + L2 Cache).</li>
  * </ol>
  *
  * <p>The returned {@link PlanFeatures} always carries every field populated — if a tier is missing
@@ -33,6 +37,20 @@ import java.util.Optional;
 public class SubscriptionFeatureService {
 
     private final PlanFeatureConfig planFeatureConfig;
+    private final UserRepository userRepository;
+
+    @Cacheable(value = "subscriptionCache", key = "#restaurantId")
+    public PlanFeatures getFeaturesForRestaurant(Long restaurantId) {
+        log.info("Subscription Cache MISS for restaurantId: {}", restaurantId);
+        return userRepository.findByRestaurantId(restaurantId)
+                .map(this::getFeatures)
+                .orElseGet(PlanFeatures::new);
+    }
+
+    @CacheEvict(value = "subscriptionCache", key = "#restaurantId")
+    public void evictSubscriptionCache(Long restaurantId) {
+        log.info("Subscription Cache EVICT for restaurantId: {}", restaurantId);
+    }
 
     /**
      * Resolve the raw tier from the stored plan string, ignoring expiry.

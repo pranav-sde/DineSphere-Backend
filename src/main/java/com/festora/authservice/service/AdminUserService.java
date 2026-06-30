@@ -14,6 +14,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.annotation.Propagation;
 
+import com.festora.subscription.service.SubscriptionFeatureService;
+
 @Service
 @RequiredArgsConstructor
 public class AdminUserService {
@@ -22,6 +24,7 @@ public class AdminUserService {
     private final PasswordEncoder passwordEncoder;
     private final ApplicationEventPublisher eventPublisher;
     private final SubscriptionPlanConfig subscriptionPlanConfig;
+    private final SubscriptionFeatureService featureService;
 
     public UserResponse createRestaurantOwner(CreateOwnerRequest req) {
 
@@ -101,7 +104,10 @@ public class AdminUserService {
         user.setActive(true);
         user.setSubscriptionExpiry(newExpiry);
         user.setSubscriptionPlan(planName != null ? planName.toUpperCase() : months + "_MONTHS");
-        userRepository.save(user);
+        User saved = userRepository.save(user);
+        if (saved.getRestaurantId() != null) {
+            featureService.evictSubscriptionCache(saved.getRestaurantId());
+        }
     }
 
     public com.festora.authservice.dto.OwnerProfileResponse getProfile(String userId) {
