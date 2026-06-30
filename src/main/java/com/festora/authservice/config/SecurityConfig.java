@@ -41,7 +41,8 @@ public class SecurityConfig {
                             "https://qr.dinesphere.co",
                             "https://admin.dinesphere.co",
                             "https://stg.dinesphere.co",
-                            "https://stg.qr.dinesphere.co"
+                            "https://stg.qr.dinesphere.co",
+                            "https://stg-qr.dinesphere.co"
                     ));
                     config.setAllowedMethods(java.util.List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
                     config.setAllowedHeaders(java.util.List.of("*"));
