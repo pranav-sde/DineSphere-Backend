@@ -129,6 +129,9 @@ public class AdminUserService {
                 .latitude(user.getLatitude())
                 .longitude(user.getLongitude())
                 .restaurantId(user.getRestaurantId())
+                .logoUrl(user.getLogoUrl())
+                .logoWidth(user.getLogoWidth())
+                .logoHeight(user.getLogoHeight())
                 .build();
     }
 
@@ -147,6 +150,9 @@ public class AdminUserService {
         user.setMinOrderValue(req.getMinOrderValue());
         user.setLatitude(req.getLatitude());
         user.setLongitude(req.getLongitude());
+        user.setLogoUrl(req.getLogoUrl());
+        user.setLogoWidth(req.getLogoWidth());
+        user.setLogoHeight(req.getLogoHeight());
 
         User saved = userRepository.save(user);
 
@@ -165,6 +171,9 @@ public class AdminUserService {
                 .latitude(saved.getLatitude())
                 .longitude(saved.getLongitude())
                 .restaurantId(saved.getRestaurantId())
+                .logoUrl(saved.getLogoUrl())
+                .logoWidth(saved.getLogoWidth())
+                .logoHeight(saved.getLogoHeight())
                 .build();
     }
 

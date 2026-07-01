@@ -16,4 +16,8 @@ public class UpdateProfileRequest {
     private String minOrderValue;
     private String latitude;
     private String longitude;
+
+    private String logoUrl;
+    private Integer logoWidth;
+    private Integer logoHeight;
 }

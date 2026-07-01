@@ -101,11 +101,11 @@ app:
           multipleBranches: true
           analyticsLevel: ADVANCED
           prioritySupport: true
-        # TRIAL mirrors PREMIUM so the 1-month free trial gets the full experience.
+        # TRIAL mirrors PREMIUM but with 3 tables and 20 menu items limit.
         TRIAL:
-          maxMenuItems: -1
-          maxTables: -1
-          maxCategories: -1
+          maxMenuItems: 20
+          maxTables: 3
+          maxCategories: 3
           whatsappNotifications: true
           telegramNotifications: true
           inventoryManagement: true

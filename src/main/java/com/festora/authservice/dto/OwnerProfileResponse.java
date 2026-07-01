@@ -25,4 +25,8 @@ public class OwnerProfileResponse {
     private String latitude;
     private String longitude;
     private Long restaurantId;
+
+    private String logoUrl;
+    private Integer logoWidth;
+    private Integer logoHeight;
 }

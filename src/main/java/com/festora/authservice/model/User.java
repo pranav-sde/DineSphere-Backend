@@ -47,4 +47,8 @@ public class User {
 
     private String subscriptionPlan;
     private java.time.LocalDateTime subscriptionExpiry;
+
+    private String logoUrl;
+    private Integer logoWidth;
+    private Integer logoHeight;
 }
