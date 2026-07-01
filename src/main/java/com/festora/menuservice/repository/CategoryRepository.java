@@ -10,6 +10,8 @@ import java.util.List;
 public interface CategoryRepository
         extends MongoRepository<Category, String> {
     List<Category> findByRestaurantIdOrderBySortOrderAsc(Long restaurantId);
+
+    long countByRestaurantId(Long restaurantId);
 }
 
 

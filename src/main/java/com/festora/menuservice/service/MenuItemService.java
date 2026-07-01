@@ -21,6 +21,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.util.CollectionUtils;
 import org.springframework.util.ObjectUtils;
 
+import com.festora.subscription.config.PlanFeatures;
+import com.festora.subscription.service.SubscriptionFeatureService;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -35,6 +37,7 @@ public class MenuItemService {
     private final MenuMapper menuMapper;
     private final RedisUtils redisUtils;
     private final CacheManager cacheManager;
+    private final SubscriptionFeatureService featureService;
 
     @Cacheable(value = "menuCache", key = "'menu:' + #restaurantId + ':cat:' + #categoryId")
     public List<MenuItemDto> getMenuItemsByCategory(
@@ -87,12 +90,25 @@ public class MenuItemService {
                 .build();
     }
 
+    private void checkMenuItemLimit(Long restaurantId) {
+        PlanFeatures features = featureService.getFeaturesForRestaurant(restaurantId);
+        int maxItems = features.getMaxMenuItems();
+        if (maxItems != -1) {
+            long currentItemsCount = itemRepo.countByRestaurantIdAndEnabled(restaurantId, true);
+            if (currentItemsCount >= maxItems) {
+                throw new IllegalStateException("Maximum menu items limit reached for this plan (" + maxItems + "). Please upgrade your plan.");
+            }
+        }
+    }
+
     @CacheEvict(value = {"menuCache", "menuPriceCache"}, allEntries = true)
     public MenuItemDto createMenuItem(
             MenuItemDto dto,
             Long restaurantId,
             String categoryId
     ) {
+        checkMenuItemLimit(restaurantId);
+
         MenuItem entity = menuMapper.toMenuItemEntity(dto);
 
         entity.setRestaurantId(restaurantId);
@@ -136,6 +152,10 @@ public class MenuItemService {
                 .orElseThrow(() ->
                         new IllegalArgumentException("Menu item not found: " + menuItemId)
                 );
+
+        if (enabled && !Boolean.TRUE.equals(item.getEnabled())) {
+            checkMenuItemLimit(item.getRestaurantId());
+        }
 
         item.setEnabled(enabled);
         item.setUpdatedAt(System.currentTimeMillis());

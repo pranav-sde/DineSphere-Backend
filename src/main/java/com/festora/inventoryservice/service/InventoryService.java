@@ -14,6 +14,8 @@ import org.springframework.cache.annotation.Cacheable;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
+import com.festora.subscription.config.PlanFeatures;
+import com.festora.subscription.service.SubscriptionFeatureService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -32,6 +34,7 @@ public class InventoryService {
     private final InventoryReservationItemRepository reservationItemRepo;
     private final InventoryItemRepository inventoryItemRepo;
     private final CacheManager cacheManager;
+    private final SubscriptionFeatureService featureService;
 
     /* =========================================================
        ORDER → INVENTORY FLOW
@@ -363,6 +366,17 @@ public class InventoryService {
        OWNER → INVENTORY FLOW
        ========================================================= */
 
+    private void checkInventoryManagementFeature(Long restaurantId) {
+        PlanFeatures features = featureService.getFeaturesForRestaurant(restaurantId);
+        if (!features.isInventoryManagement()) {
+            throw new IllegalStateException("Inventory Management is a Premium feature. Please upgrade your plan.");
+        }
+    }
+
+    /* =========================================================
+       ADMIN / OWNER INVENTORY CRUD
+       ========================================================= */
+
     /**
      * GET /all — cached by restaurantId.
      * WHY: Each call does findAllByRestaurantId + N stock lookups = N+1 DB queries.
@@ -370,6 +384,7 @@ public class InventoryService {
      */
     @Cacheable(value = "ownerInventory", key = "#restaurantId", sync = true)
     public List<OwnerInventoryResponse> getInventory(Long restaurantId) {
+        checkInventoryManagementFeature(restaurantId);
         log.info("Cache MISS: fetching inventory from DB for restaurant {}", restaurantId);
         
         List<InventoryItem> items = inventoryItemRepo.findAllByRestaurantId(restaurantId);
@@ -393,6 +408,8 @@ public class InventoryService {
         InventoryItem item = inventoryItemRepo.findById(req.getInventoryItemId())
                 .orElseThrow(() -> new IllegalArgumentException("Inventory item not found"));
 
+        checkInventoryManagementFeature(item.getRestaurantId());
+
         InventoryStock stock = stockRepo.findById(item.getId())
                 .orElseThrow(() -> new IllegalStateException("Inventory stock missing"));
 
@@ -409,6 +426,7 @@ public class InventoryService {
 
     @Transactional
     public void bulkUpsertStock(BulkUpdateStockRequest req, Long restaurantId) {
+        checkInventoryManagementFeature(restaurantId);
         if (req.getItems() == null || req.getItems().isEmpty()) {
             throw new IllegalArgumentException("Items list cannot be empty");
         }
@@ -515,9 +533,10 @@ public class InventoryService {
     }
 
     public void toggleInventory(ToggleInventoryRequest req) {
-
         InventoryItem item = inventoryItemRepo.findById(req.getInventoryItemId())
                 .orElseThrow(() -> new IllegalArgumentException("Inventory item not found"));
+
+        checkInventoryManagementFeature(item.getRestaurantId());
 
         item.setEnabled(req.isEnabled());
         item.setUpdatedAt(System.currentTimeMillis());
@@ -596,6 +615,7 @@ public class InventoryService {
 
     @Transactional
     public void createInventoryItem(CreateInventoryItemRequest req) {
+        checkInventoryManagementFeature(req.getRestaurantId());
         String variantId = normalizeVariantId(req.getVariantId());
 
         // Precise lookup (checks for null variant correctly)

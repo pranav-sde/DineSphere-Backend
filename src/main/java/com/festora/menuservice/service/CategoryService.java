@@ -3,6 +3,8 @@ package com.festora.menuservice.service;
 import com.festora.menuservice.dto.CategoryDto;
 import com.festora.menuservice.entity.Category;
 import com.festora.menuservice.repository.CategoryRepository;
+import com.festora.subscription.config.PlanFeatures;
+import com.festora.subscription.service.SubscriptionFeatureService;
 import io.micrometer.common.util.StringUtils;
 import lombok.RequiredArgsConstructor;
 import org.springframework.cache.annotation.CacheEvict;
@@ -16,6 +18,7 @@ import java.util.List;
 public class CategoryService {
 
     private final CategoryRepository categoryRepo;
+    private final SubscriptionFeatureService featureService;
 
     @Cacheable(value = "menuCache", key = "'categories:' + #restaurantId")
     public List<CategoryDto> getCategories(Long restaurantId) {
@@ -42,9 +45,16 @@ public class CategoryService {
             throw new IllegalArgumentException("Category name is required");
         }
 
-        int nextOrder = categoryRepo
-                .findByRestaurantIdOrderBySortOrderAsc(restaurantId)
-                .size() + 1;
+        PlanFeatures features = featureService.getFeaturesForRestaurant(restaurantId);
+        int maxCategories = features.getMaxCategories();
+        if (maxCategories != -1) {
+            long currentCategoriesCount = categoryRepo.countByRestaurantId(restaurantId);
+            if (currentCategoriesCount >= maxCategories) {
+                throw new IllegalStateException("Maximum categories limit reached for this plan (" + maxCategories + "). Please upgrade your plan.");
+            }
+        }
+
+        int nextOrder = (int) categoryRepo.countByRestaurantId(restaurantId) + 1;
 
         Category saved = categoryRepo.save(
                 Category.builder()

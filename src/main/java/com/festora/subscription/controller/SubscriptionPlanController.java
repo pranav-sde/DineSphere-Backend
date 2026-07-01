@@ -50,7 +50,7 @@ public class SubscriptionPlanController {
     public ResponseEntity<PlanMarketingResponse> getPlans() {
         List<PlanMarketingResponse.TierDetail> tiers = new ArrayList<>();
 
-        for (PlanTier tier : List.of(PlanTier.FREE, PlanTier.BASIC, PlanTier.PREMIUM)) {
+        for (PlanTier tier : List.of(PlanTier.BASIC, PlanTier.PREMIUM)) {
             PlanFeatures features = featureService.getFeaturesForTier(tier);
             PlanFeatureConfig.Marketing marketing = planFeatureConfig.getMarketing() != null
                     ? planFeatureConfig.getMarketing().get(tier) : null;
